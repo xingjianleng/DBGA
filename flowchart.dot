@@ -1,0 +1,81 @@
+digraph flowchart {
+    // default settings
+    node [shape="box"];
+    compound=True;
+
+    // Nodes for algorithm
+    Input [
+        label="Input sequences \n (closely related sequences collections)"
+    ];
+    deBruijn [
+        label="Generate de Bruijn graph"
+    ];
+    Mapping [
+        label="Mapping algorithm \n from de Bruijn graph to Partial Order graph"
+    ];
+    PO [
+        label="Obtaining the Partial Order representation"
+    ];
+    Extract [
+        label="Extract alignment from Partial Order representation"
+    ];
+
+    // Nodes for benchmark
+    Perform [
+        label="Performance measures \n (Benchmark)"
+    ];
+    Scale [
+        label="Scalability"
+    ];
+    Quality [
+        label="Alignment quality"
+    ];
+    RCQuality [
+        label="Row-column alignment quality measure"
+    ];
+    GraphQuality [
+        label="Graph alignment quality measure"
+    ];
+    Script [
+        label="Script for different algorithm auto-execution \n (with profilers)"
+    ];
+    Mem [
+        label="Memory scalability"
+    ];
+    Time [
+        label="Time scalability"
+    ];
+
+    // subgraph for algorithm
+    subgraph cluster_algo {
+        label="Whole alignment algorithm";
+        labeljust=l;
+        deBruijn -> Mapping;
+        Mapping -> PO;
+        PO -> Extract;
+    }
+
+    // subgraph for alignment quality benchmark
+    subgraph cluster_quality {
+        label="Different alignment quality measurement";
+        labelloc=b;
+        RCQuality;
+        GraphQuality;
+    }
+
+    // subgraph for alignment performance benchmark
+    subgraph cluster_scale {
+        label="Scalability measurement";
+        labelloc=b;
+        Mem;
+        Time;
+    }
+
+    // edges to connect nodes and subgraphs
+    Input -> deBruijn;
+    Extract -> Perform;
+    Perform -> {Quality, Scale};
+    Quality -> {RCQuality, GraphQuality};
+    Scale -> Script;
+    Script -> {Mem, Time}
+}
