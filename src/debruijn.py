@@ -5,6 +5,28 @@ import subprocess
 from cogent3 import load_unaligned_seqs
 
 
+class Modcounter:
+    def __init__(self, max_bound: int = 1) -> None:
+        self.__counter: int = 0
+        self.max_bound: int = max_bound
+
+    def inc(self) -> None:
+        self.__counter = (self.__counter + 1) % self.max_bound
+
+    def update_bound(self, new_max_bound: int) -> None:
+        self.max_bound = new_max_bound
+        if self.__counter > self.max_bound:
+            self.__counter = self.max_bound - 1
+
+    def reset(self) -> None:
+        self.__counter: int = 0
+        self.max_bound: int = 1
+
+    @property
+    def counter(self) -> int:
+        return self.__counter
+
+
 class Edge:
     def __init__(self, out_node: int, in_node: int) -> None:
         self.out_node = out_node
@@ -40,13 +62,16 @@ class deBruijn:
     def __init__(self, k: int) -> None:
         self.id_count = 0
         self.k = k
+        self.start_ids = []
         self.nodes = {}
         self.exist_kmer = {}
 
-    def __add_node(self, kmer: str) -> int:
+    def __add_node(self, kmer: str, start: bool = False) -> int:
         if kmer in self.exist_kmer:
             self.nodes[self.exist_kmer[kmer]].count += 1
             return self.exist_kmer[kmer]
+        if start:
+            self.start_ids.append(self.id_count)
         new_node = Node(self.id_count, kmer)
         self.nodes[self.id_count] = new_node
         self.exist_kmer[kmer] = self.id_count
@@ -60,11 +85,11 @@ class deBruijn:
     def add_sequence(self, sequence: str) -> None:
         # there should be (n - k + 1) kmers, tackle two kmers each time
         index = 0
-        kmer = sequence[index: index + self.k]
-        next_id = self.__add_node(kmer)
+        kmer = str(sequence[index: index + self.k])
+        next_id = self.__add_node(kmer, True)
         while index < len(sequence) - self.k:
             prev_id = next_id
-            kmer = sequence[index + 1: index + self.k + 1]
+            kmer = str(sequence[index + 1: index + self.k + 1])
             next_id = self.__add_node(kmer)
             self.__add_edge(prev_id, next_id)
             index += 1
@@ -115,10 +140,18 @@ class deBruijn:
                 check=True
             )
 
-    def to_POA(self):
-        node_queue = deque()
+    def to_POA(self) -> None:
+        node_queue = deque(self.start_ids)
         branch = []
-        node_queue.append(0)
+        branch_buffer = []
+        index = Modcounter()
+        # FIXME: if the graph starts with two brances, we need to add appropriate stuff in initialization
+        # if graph starts with branches, add them to the branch list
+        if len(self.start_ids) > 1:
+            branch.append(len(node_queue))
+            index.update_bound(len(branch) + 1)
+            while len(branch_buffer) <= len(branch):
+                branch_buffer.append([])
 
         # using breadth first search
         while len(node_queue) != 0:
@@ -137,24 +170,43 @@ class deBruijn:
             # `len(node_queue) == 0`` isn't good as branch can appear as ends
             if not self.nodes[curr_node_id].out_edges:
                 # all nucleiotides are required for terminal node
+                # FIXME: If branch is open, we will have to add all branch node too
                 print(self.nodes[curr_node_id].kmer)
             elif not branch:
                 # if ther isn't any branch, take the normal nucleiotide
                 print(self.nodes[curr_node_id].kmer[0])
-            else:
-                # shouldn't be necessary here
-                # FIXME: Should cumulate all branch nodes and tackle them in merge part
-                print("Attention!")
+            elif self.nodes[curr_node_id].count not in branch:
+                # cumulate all branch nodes and tackle them in merge part
+                branch_buffer[index.counter].append(self.nodes[curr_node_id].kmer[0])
+                index.inc()
 
             # check whether we need to merge the branches
-            if branch and len(node_queue) == branch[-1]:
+            if branch:
                 merge_node = node_queue[0]
+                # FIXME: For multiple sequences, there could be multiple branches
                 if self.nodes[merge_node].count == branch[-1] and all(
                     merge_node == node_queue[i] for i in range(branch[-1])
                 ):
                     del branch[-1]
                     node_queue.popleft()
+            
+            # TODO: extract the branch contents and add them to partial order graph
+            if not branch and branch_buffer:
+                print(''.join(branch_buffer[0]))
+                print(''.join(branch_buffer[1]))
+                branch_buffer = []
+                index.reset()
 
             # if there is any branches (more than one out_edges), add the number of branches
             if len(self.nodes[curr_node_id].out_edges) > 1:
                 branch.append(self.nodes[curr_node_id].count)
+                # append list to branch_buffer list until there are len(branch) + 1 elements
+                index.update_bound(len(branch) + 1)
+                while len(branch_buffer) <= len(branch):
+                    branch_buffer.append([])
+
+
+d = deBruijn(3)
+d.load_sequences("~/repos/COMP3770-xingjian/data/ex2.fasta")
+# d.visualize("~/repos/COMP3770-xingjian/src/ex2.png", cleanup=True)
+d.to_POA()
