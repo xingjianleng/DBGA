@@ -8,6 +8,7 @@ from cogent3 import load_unaligned_seqs
 class Modcounter:
     def __init__(self, max_bound: int = 1) -> None:
         self.__counter: int = 0
+        self.default = max_bound
         self.max_bound: int = max_bound
 
     def inc(self) -> None:
@@ -16,11 +17,11 @@ class Modcounter:
     def update_bound(self, new_max_bound: int) -> None:
         self.max_bound = new_max_bound
         if self.__counter > self.max_bound:
-            self.__counter = self.max_bound - 1
+            self.__counter = 0
 
     def reset(self) -> None:
         self.__counter: int = 0
-        self.max_bound: int = 1
+        self.max_bound: int = self.default
 
     @property
     def counter(self) -> int:
@@ -142,15 +143,15 @@ class deBruijn:
 
     def to_POA(self) -> None:
         node_queue = deque(self.start_ids)
-        branch = []
+        branch = False
+        terminal_branch = False
         branch_buffer = []
         index = Modcounter()
-        # FIXME: if the graph starts with two brances, we need to add appropriate stuff in initialization
         # if graph starts with branches, add them to the branch list
         if len(self.start_ids) > 1:
-            branch.append(len(node_queue))
-            index.update_bound(len(branch) + 1)
-            while len(branch_buffer) <= len(branch):
+            branch = True
+            index.update_bound(2)
+            while len(branch_buffer) < 2:
                 branch_buffer.append([])
 
         # using breadth first search
@@ -158,7 +159,7 @@ class deBruijn:
             # pop the node_id from the queue
             curr_node_id = node_queue.popleft()
 
-            if branch and self.nodes[curr_node_id].count == branch[-1]:
+            if branch and self.nodes[curr_node_id].count == 2:
                 # if currently in two branches and we know we are getting out of branch
                 node_queue.append(curr_node_id)
             else:
@@ -167,46 +168,55 @@ class deBruijn:
                     node_queue.append(successor)
 
             # TODO: the part to write a partial order graph
-            # `len(node_queue) == 0`` isn't good as branch can appear as ends
             if not self.nodes[curr_node_id].out_edges:
                 # all nucleiotides are required for terminal node
-                # FIXME: If branch is open, we will have to add all branch node too
-                print(self.nodes[curr_node_id].kmer)
-            elif not branch:
+                # if branch is open, we will have a way to do the comparison
+                if branch:
+                    branch_buffer[index.counter].append(
+                        self.nodes[curr_node_id].kmer)
+                    terminal_kmer = ''.join(branch_buffer[index.counter])
+                    index.update_bound(1)
+                    del branch_buffer[index.counter]
+                    terminal_branch = True
+                    branch = False
+                elif terminal_branch:
+                    # TODO: Consider how we align two sequences here (add to partial order graph)
+                    print(terminal_kmer)
+                    branch_buffer[index.counter].append(
+                        self.nodes[curr_node_id].kmer)
+                    print(''.join(branch_buffer[index.counter]))
+                    branch_buffer = []
+                    index.reset()
+                else:
+                    # if there is no branch in the end, two sequences are aligned
+                    print(self.nodes[curr_node_id].kmer)
+            elif not branch and not terminal_branch:
                 # if ther isn't any branch, take the normal nucleiotide
                 print(self.nodes[curr_node_id].kmer[0])
-            elif self.nodes[curr_node_id].count not in branch:
+            else:
                 # cumulate all branch nodes and tackle them in merge part
-                branch_buffer[index.counter].append(self.nodes[curr_node_id].kmer[0])
+                branch_buffer[index.counter].append(
+                    self.nodes[curr_node_id].kmer[0])
                 index.inc()
 
             # check whether we need to merge the branches
             if branch:
                 merge_node = node_queue[0]
-                # FIXME: For multiple sequences, there could be multiple branches
-                if self.nodes[merge_node].count == branch[-1] and all(
-                    merge_node == node_queue[i] for i in range(branch[-1])
-                ):
-                    del branch[-1]
+                if self.nodes[merge_node].count == 2 and merge_node == node_queue[1]:
+                    branch = False
                     node_queue.popleft()
-            
+
             # TODO: extract the branch contents and add them to partial order graph
-            if not branch and branch_buffer:
+            if not branch and not terminal_branch and branch_buffer:
                 print(''.join(branch_buffer[0]))
                 print(''.join(branch_buffer[1]))
+                # reset the branch collector
                 branch_buffer = []
                 index.reset()
 
             # if there is any branches (more than one out_edges), add the number of branches
             if len(self.nodes[curr_node_id].out_edges) > 1:
-                branch.append(self.nodes[curr_node_id].count)
-                # append list to branch_buffer list until there are len(branch) + 1 elements
-                index.update_bound(len(branch) + 1)
-                while len(branch_buffer) <= len(branch):
+                branch = True
+                index.update_bound(2)
+                while len(branch_buffer) < 2:
                     branch_buffer.append([])
-
-
-d = deBruijn(3)
-d.load_sequences("~/repos/COMP3770-xingjian/data/ex2.fasta")
-# d.visualize("~/repos/COMP3770-xingjian/src/ex2.png", cleanup=True)
-d.to_POA()
