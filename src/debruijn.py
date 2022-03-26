@@ -3,6 +3,7 @@ from pathlib import Path
 import subprocess
 
 from cogent3 import load_unaligned_seqs
+import pydotplus
 
 
 class Modcounter:
@@ -197,11 +198,12 @@ class deBruijn:
             str: the DOT representation of edges in original graph
         """
         rtn = []
-        for node in self.nodes.values():
-            rtn.extend(
-                f'\t{node.id} -> {other_node} [label="{node.kmer[1:]}", weight={edge.multiplicity}];\n'
-                for other_node, edge in node.out_edges.items()
-            )
+        for index, node in enumerate(self.nodes.values()):
+            for other_node, edge in node.out_edges.items():
+                current_row = f'\t{node.id} -> {other_node} [label="{node.kmer[1:]}", weight={edge.multiplicity}];'
+                if index != len(self.nodes) - 1:
+                    current_row += '\n'
+                rtn.append(current_row)
         return ''.join(rtn)
 
     def __to_DOT(self, path: Path) -> None:
@@ -232,17 +234,10 @@ class deBruijn:
             raise ValueError("Not supported file format")
         dot_file = file_path.with_suffix(".DOT")
         self.__to_DOT(dot_file)
-        subprocess.run(
-            f'dot -T{suffix} {dot_file.__str__()} -o {file_path.__str__()}',
-            shell=True,
-            check=True
-        )
+        g = pydotplus.graph_from_dot_file(dot_file)
+        g.write(file_path.__str__(), format=suffix)
         if cleanup:
-            subprocess.run(
-                f'rm {dot_file.__str__()}',
-                shell=True,
-                check=True
-            )
+            dot_file.unlink()
 
     def to_POA(self) -> None:
         """Map the de Bruij graph to a partial order graph"""
