@@ -1,58 +1,15 @@
-from collections import deque
+from collections import Counter
 from pathlib import Path
 import subprocess
 
 from cogent3 import load_unaligned_seqs
-import pydotplus
-
-
-class Modcounter:
-    """The counter object that is bounded by a maximum value"""
-
-    def __init__(self, max_bound: int = 1) -> None:
-        """The constructor for the Modcounter object
-
-        Args:
-            max_bound (int, optional): the maximum bound of the counter. Defaults to 1.
-        """
-        self.__counter: int = 0
-        self.default = max_bound
-        self.max_bound: int = max_bound
-
-    def inc(self) -> None:
-        """Increment the counter variable, rounded if going over the max_bound"""
-        self.__counter = (self.__counter + 1) % self.max_bound
-
-    def update_bound(self, new_max_bound: int) -> None:
-        """Update the max_bound of the Modcounter object
-
-        Args:
-            new_max_bound (int): the new max bound of the counter
-        """
-        self.max_bound = new_max_bound
-        # if the conter variable is out of the range, reset it to 0
-        if self.__counter >= self.max_bound:
-            self.__counter = 0
-
-    def reset(self) -> None:
-        """Reset the counter variable and max_bound to default value"""
-        self.__counter: int = 0
-        self.max_bound: int = self.default
-
-    @property
-    def counter(self) -> int:
-        """Getter method for the counter variable
-
-        Returns:
-            int: the counter variable value
-        """
-        return self.__counter
+from cogent3 import SequenceCollection
 
 
 class Edge:
     """The Edge class to connect two nodes"""
 
-    def __init__(self, out_node: int, in_node: int) -> None:
+    def __init__(self, out_node: int, in_node: int, duplicate_str: str = '') -> None:
         """Constructor for the Edge class
 
         Args:
@@ -61,6 +18,7 @@ class Edge:
         """
         self.out_node = out_node
         self.in_node = in_node
+        self.duplicate_str = duplicate_str
         self.multiplicity = 1
 
 
@@ -77,23 +35,10 @@ class Node:
         self.id = id
         self.kmer = kmer
         # the edge between two nodes won't be duplicate in the same direction
-        self.in_edges = {}
         self.out_edges = {}
         self.count = 1
 
-    def add_in_edge(self, other_id: int) -> None:
-        """Add the edge from other node to this node
-
-        Args:
-            other_id (int): the starting node id of the edge
-        """
-        if other_id in self.in_edges:
-            self.in_edges[other_id].multiplicity += 1
-        else:
-            new_edge = Edge(other_id, self.id)
-            self.in_edges[other_id] = new_edge
-
-    def add_out_edge(self, other_id: int) -> None:
+    def add_out_edge(self, other_id: int, duplicate_str: str = '') -> None:
         """Add the edge from this node to other node
 
         Args:
@@ -102,7 +47,7 @@ class Node:
         if other_id in self.out_edges:
             self.out_edges[other_id].multiplicity += 1
         else:
-            new_edge = Edge(self.id, other_id)
+            new_edge = Edge(self.id, other_id, duplicate_str=duplicate_str)
             self.out_edges[other_id] = new_edge
 
 
@@ -121,12 +66,11 @@ class deBruijn:
         self.nodes = {}
         self.exist_kmer = {}
 
-    def __add_node(self, kmer: str, start: bool = False) -> int:
+    def __add_node(self, kmer: str) -> int:
         """Add a single node to the de Bruijn graph
 
         Args:
-            kmer (str): the kmer from the sequence
-            start (bool, optional): whether it is the first kmer from the sequence. Defaults to False.
+            kmer (str): the kmer from the sequenceDefaults to False.
 
         Returns:
             int: the node id of the provided kmer
@@ -134,42 +78,65 @@ class deBruijn:
         if kmer in self.exist_kmer:
             self.nodes[self.exist_kmer[kmer]].count += 1
             return self.exist_kmer[kmer]
-        if start:
+        if kmer == '$':
             self.start_ids.append(self.id_count)
         new_node = Node(self.id_count, kmer)
         self.nodes[self.id_count] = new_node
-        self.exist_kmer[kmer] = self.id_count
+        if kmer not in ['$', '#']:
+            self.exist_kmer[kmer] = self.id_count
         self.id_count += 1
         return self.id_count - 1
 
-    def __add_edge(self, out_id: int, in_id: int) -> None:
+    def __add_edge(self, out_id: int, in_id: int, duplicate_str: str = '') -> None:
         """Connect two kmers in the de Bruijn graph with an edge
 
         Args:
             out_id (int): the starting node id
-            in_id (int): the terminal node id
+            duplicated_str (str): the duplicated kmers in the sequence
         """
-        self.nodes[out_id].add_out_edge(in_id)
-        self.nodes[in_id].add_in_edge(out_id)
+        self.nodes[out_id].add_out_edge(in_id, duplicate_str=duplicate_str)
 
-    def add_sequence(self, sequence: str) -> None:
-        """Add a sequence to the de Bruijn graph
+    def __kmers(self, sequence: str, k: int) -> Counter:
+        kmers_str = [sequence[i: i + k] for i in range(len(sequence) - k + 1)]
+        return Counter(kmers_str)
+
+    def add_sequences(self, seqs: SequenceCollection) -> None:
+        """Construct de Bruijn graph for the given sequences
 
         Args:
-            sequence (str): the sequence provided
+            seqs (SequenceCollection): The SequenceCollection object that contains the sequences for de Bruijn graph
         """
-        # there should be (n - k + 1) kmers, tackle two kmers each time
-        index = 0
-        kmer = str(sequence[index: index + self.k])
-        next_id = self.__add_node(kmer, True)
-        while index < len(sequence) - self.k:
-            prev_id = next_id
-            kmer = str(sequence[index + 1: index + self.k + 1])
-            next_id = self.__add_node(kmer)
-            self.__add_edge(prev_id, next_id)
-            index += 1
+        # get kmer counters
+        kmer_seqs = [self.__kmers(seq, self.k) for seq in seqs.iter_seqs()]
+        # find the duplicate kmers in each sequence and add them to de Bruijn graph
+        duplicate_kmer = set()
+        for counter in kmer_seqs:
+            for key, value in counter.items():
+                if value > 1:
+                    duplicate_kmer.add(key)
+        # add nodes to de Bruijn graph
+        for counter in kmer_seqs:
+            acc = ''
+            for i, (key, _) in enumerate(counter.items()):
+                if i == 0:
+                    # starting node
+                    new_node = self.__add_node("$")
+                prev_node = new_node
+                if key in duplicate_kmer:
+                    acc += key
+                    new_node = prev_node
+                elif acc != '':
+                    new_node = self.__add_node(key)
+                    self.__add_edge(prev_node, new_node, acc)
+                    acc = ''
+                else:
+                    new_node = self.__add_node(key)
+                    self.__add_edge(prev_node, new_node)
+                if i == len(counter) - 1:
+                    end_node = self.__add_node('#')
+                    self.__add_edge(new_node, end_node)
 
-    def load_sequences(self, path: str, moltype: str = 'dna') -> None:
+    def load_fasta(self, path: str, moltype: str = 'dna') -> None:
         """Load sequences from a fasta file and add sequences to the de Bruijn graph
 
         Args:
@@ -178,8 +145,7 @@ class deBruijn:
         """
         fasta_path = Path(path).expanduser().absolute()
         seqs = load_unaligned_seqs(fasta_path, moltype=moltype)
-        for seq in seqs.iter_seqs():
-            self.add_sequence(seq)
+        self.add_sequences(seqs=seqs)
 
     def __nodes_DOT_repr(self) -> str:
         """Get the DOT representation of nodes in de Bruijn graph
@@ -200,7 +166,7 @@ class deBruijn:
         rtn = []
         for index, node in enumerate(self.nodes.values()):
             for other_node, edge in node.out_edges.items():
-                current_row = f'\t{node.id} -> {other_node} [label="{node.kmer[1:]}", weight={edge.multiplicity}];'
+                current_row = f'\t{node.id} -> {other_node} [label="{edge.duplicate_str}", weight={edge.multiplicity}];'
                 if index != len(self.nodes) - 1:
                     current_row += '\n'
                 rtn.append(current_row)
@@ -234,88 +200,13 @@ class deBruijn:
             raise ValueError("Not supported file format")
         dot_file = file_path.with_suffix(".DOT")
         self.__to_DOT(dot_file)
-        g = pydotplus.graph_from_dot_file(dot_file)
-        g.write(file_path.__str__(), format=suffix)
+        subprocess.run(
+            f'dot -T{suffix} {dot_file.__str__()} -o {file_path.__str__()}',
+            shell=True,
+            check=True
+        )
         if cleanup:
             dot_file.unlink()
 
     def to_POA(self) -> None:
-        """Map the de Bruij graph to a partial order graph"""
-        node_queue = deque(self.start_ids)
-        branch = False
-        terminal_branch = False
-        branch_buffer = []
-        index = Modcounter()
-        # if graph starts with branches, add them to the branch list
-        if len(self.start_ids) > 1:
-            branch = True
-            index.update_bound(2)
-            while len(branch_buffer) < 2:
-                branch_buffer.append([])
-
-        # using breadth first search
-        while len(node_queue) != 0:
-            # pop the node_id from the queue
-            curr_node_id = node_queue.popleft()
-
-            if branch and self.nodes[curr_node_id].count == 2:
-                # if currently in two branches and we know we are getting out of branch
-                node_queue.append(curr_node_id)
-            else:
-                # add the successors to the queue
-                for successor in self.nodes[curr_node_id].out_edges.keys():
-                    node_queue.append(successor)
-
-            # TODO: the part to write a partial order graph
-            if not self.nodes[curr_node_id].out_edges:
-                # all nucleiotides are required for terminal node
-                # if branch is open, we will have a way to do the comparison
-                if branch:
-                    branch_buffer[index.counter].append(
-                        self.nodes[curr_node_id].kmer)
-                    terminal_kmer = ''.join(branch_buffer[index.counter])
-                    index.update_bound(1)
-                    del branch_buffer[index.counter]
-                    terminal_branch = True
-                    branch = False
-                elif terminal_branch:
-                    # TODO: Consider how we align two sequences here (add to partial order graph)
-                    print(terminal_kmer)
-                    branch_buffer[index.counter].append(
-                        self.nodes[curr_node_id].kmer)
-                    print(''.join(branch_buffer[index.counter]))
-                    branch_buffer = []
-                    index.reset()
-                else:
-                    # if there is no branch in the end, two sequences are aligned
-                    print(self.nodes[curr_node_id].kmer)
-            elif not branch and not terminal_branch:
-                # if ther isn't any branch, take the normal nucleiotide
-                print(self.nodes[curr_node_id].kmer[0])
-            else:
-                # cumulate all branch nodes and tackle them in merge part
-                branch_buffer[index.counter].append(
-                    self.nodes[curr_node_id].kmer[0])
-                index.inc()
-
-            # check whether we need to merge the branches
-            if branch:
-                merge_node = node_queue[0]
-                if self.nodes[merge_node].count == 2 and merge_node == node_queue[1]:
-                    branch = False
-                    node_queue.popleft()
-
-            # TODO: extract the branch contents and add them to partial order graph
-            if not branch and not terminal_branch and branch_buffer:
-                print(''.join(branch_buffer[0]))
-                print(''.join(branch_buffer[1]))
-                # reset the branch collector
-                branch_buffer = []
-                index.reset()
-
-            # if there is any branches (more than one out_edges), add the number of branches
-            if len(self.nodes[curr_node_id].out_edges) > 1:
-                branch = True
-                index.update_bound(2)
-                while len(branch_buffer) < 2:
-                    branch_buffer.append([])
+        pass
