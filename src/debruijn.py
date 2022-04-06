@@ -1,8 +1,9 @@
 from collections import Counter
 from pathlib import Path
 import subprocess
+from typing import List, Set
 
-from cogent3 import load_unaligned_seqs
+from cogent3 import load_unaligned_seqs, make_unaligned_seqs
 from cogent3 import SequenceCollection
 
 
@@ -15,6 +16,7 @@ class Edge:
         Args:
             out_node (int): the node_id of the starting node
             in_node (int): the node_id of the terminal node
+            duplicate_str (str): the edge can represent duplicate kmers
         """
         self.out_node = out_node
         self.in_node = in_node
@@ -43,6 +45,7 @@ class Node:
 
         Args:
             other_id (int): the terminal node id of the edge
+            duplicated_str (str, optional): the duplicated kmer represented by the edge. Defaults to ''
         """
         if other_id in self.out_edges:
             self.out_edges[other_id].multiplicity += 1
@@ -54,17 +57,31 @@ class Node:
 class deBruijn:
     """The de Bruijn graph class, with many useful method"""
 
-    def __init__(self, k: int) -> None:
+    def __init__(self, sequence, k: int) -> None:
         """Constructor for a de Bruijn graph
 
         Args:
+            sequence (Any): can be path to sequences or List of sequences or SequenceCollection objects
             k (int): the kmer size for the de Bruijn graph
         """
         self.id_count = 0
         self.k = k
+        self.num_seq = 0
         self.start_ids = []
         self.nodes = {}
         self.exist_kmer = {}
+        if isinstance(sequence, str):
+            path = Path(sequence).expanduser().absolute()
+            self.sequence = load_unaligned_seqs(path)
+            self.seq_node_idx = self.add_sequences(self.sequence)
+        elif isinstance(sequence, SequenceCollection):
+            self.sequence = sequence
+            self.seq_node_idx = self.add_sequences(sequence)
+        elif isinstance(sequence, list) and all(isinstance(elem, str) for elem in sequence):
+            self.sequence = make_unaligned_seqs(sequence)
+            self.seq_node_idx = self.add_sequences(self.sequence)
+        else:
+            raise ValueError('Invalid input type for sequence argument')
 
     def __add_node(self, kmer: str) -> int:
         """Add a single node to the de Bruijn graph
@@ -92,60 +109,67 @@ class deBruijn:
 
         Args:
             out_id (int): the starting node id
-            duplicated_str (str): the duplicated kmers in the sequence
+            in_id (int): the terminal node id
+            duplicated_str (str, optional): the duplicated kmer represented by the edge. Defaults to ''
         """
         self.nodes[out_id].add_out_edge(in_id, duplicate_str=duplicate_str)
 
-    def __kmers(self, sequence: str, k: int) -> Counter:
+    def __kmers(self, sequence: str, duplicate_kmer: Set, k: int) -> List[str]:
         kmers_str = [sequence[i: i + k] for i in range(len(sequence) - k + 1)]
-        return Counter(kmers_str)
+        counter = Counter(kmers_str)
+        for key, value in counter.items():
+            if value > 1:
+                duplicate_kmer.add(key)
+        return kmers_str
 
-    def add_sequences(self, seqs: SequenceCollection) -> None:
+    def add_sequences(self, seqs: SequenceCollection) -> List[List[int]]:
         """Construct de Bruijn graph for the given sequences
 
         Args:
             seqs (SequenceCollection): The SequenceCollection object that contains the sequences for de Bruijn graph
         """
-        # get kmer counters
-        kmer_seqs = [self.__kmers(seq, self.k) for seq in seqs.iter_seqs()]
+        self.num_seq = seqs.num_seqs
+        # the list of list to record the node index for each sequence
+        seq_node_idx = []
         # find the duplicate kmers in each sequence and add them to de Bruijn graph
         duplicate_kmer = set()
-        for counter in kmer_seqs:
-            for key, value in counter.items():
-                if value > 1:
-                    duplicate_kmer.add(key)
+        # get kmers
+        kmer_seqs = [
+            self.__kmers(str(seq), duplicate_kmer, self.k)
+            for seq in seqs.iter_seqs()
+        ]
+
         # add nodes to de Bruijn graph
-        for counter in kmer_seqs:
+        for i, kmers in enumerate(kmer_seqs):
+            # to record the duplicated kmers
             acc = ''
-            for i, (key, _) in enumerate(counter.items()):
-                if i == 0:
+            for j, kmer in enumerate(kmers):
+                if j == 0:
                     # starting node
                     new_node = self.__add_node("$")
+                    seq_node_idx.append([])
+                # store the previous node index
                 prev_node = new_node
-                if key in duplicate_kmer:
-                    acc += key
+                if kmer in duplicate_kmer:
+                    acc += kmer
                     new_node = prev_node
                 elif acc != '':
-                    new_node = self.__add_node(key)
+                    # if there are duplicated kmers, store them in the edge
+                    new_node = self.__add_node(kmer)
+                    seq_node_idx[i].append(new_node)
                     self.__add_edge(prev_node, new_node, acc)
                     acc = ''
                 else:
-                    new_node = self.__add_node(key)
+                    # if there is no duplicated kmer, add new nodes
+                    new_node = self.__add_node(kmer)
+                    seq_node_idx[i].append(new_node)
                     self.__add_edge(prev_node, new_node)
-                if i == len(counter) - 1:
+                if j == len(kmers) - 1:
+                    # create the terminal node and connect with the previous node
                     end_node = self.__add_node('#')
                     self.__add_edge(new_node, end_node)
-
-    def load_fasta(self, path: str, moltype: str = 'dna') -> None:
-        """Load sequences from a fasta file and add sequences to the de Bruijn graph
-
-        Args:
-            path (str): path to the fasta file
-            moltype (str, optional): molecular type of the sequence. Defaults to 'dna'.
-        """
-        fasta_path = Path(path).expanduser().absolute()
-        seqs = load_unaligned_seqs(fasta_path, moltype=moltype)
-        self.add_sequences(seqs=seqs)
+        # return the indicies of nodes for each sequence
+        return seq_node_idx
 
     def __nodes_DOT_repr(self) -> str:
         """Get the DOT representation of nodes in de Bruijn graph
