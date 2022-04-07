@@ -3,8 +3,13 @@ from pathlib import Path
 import subprocess
 from typing import List, Set
 
+from cogent3.align import global_pairwise, make_dna_scoring_dict
 from cogent3 import load_unaligned_seqs, make_unaligned_seqs
 from cogent3 import SequenceCollection
+
+
+# the scoring dict for aligning bubbles
+s = make_dna_scoring_dict(10, -1, -8)
 
 
 class Edge:
@@ -67,19 +72,22 @@ class deBruijn:
         self.id_count = 0
         self.k = k
         self.num_seq = 0
-        self.start_ids = []
         self.nodes = {}
         self.exist_kmer = {}
+        self.seq_node_idx = {}
+        self.merge_node_idx = set()
+        self.seq_end_idx = []
         if isinstance(sequence, str):
             path = Path(sequence).expanduser().absolute()
             self.sequence = load_unaligned_seqs(path)
-            self.seq_node_idx = self.add_sequences(self.sequence)
+            self.add_sequences(self.sequence)
         elif isinstance(sequence, SequenceCollection):
             self.sequence = sequence
-            self.seq_node_idx = self.add_sequences(sequence)
+            self.add_sequences(self.sequence)
         elif isinstance(sequence, list) and all(isinstance(elem, str) for elem in sequence):
-            self.sequence = make_unaligned_seqs(sequence)
-            self.seq_node_idx = self.add_sequences(self.sequence)
+            self.sequence = make_unaligned_seqs(
+                {num: sequence[num] for num in range(len(sequence))})
+            self.add_sequences(self.sequence)
         else:
             raise ValueError('Invalid input type for sequence argument')
 
@@ -93,10 +101,10 @@ class deBruijn:
             int: the node id of the provided kmer
         """
         if kmer in self.exist_kmer:
-            self.nodes[self.exist_kmer[kmer]].count += 1
-            return self.exist_kmer[kmer]
-        if kmer == '$':
-            self.start_ids.append(self.id_count)
+            exist_node_id = self.exist_kmer[kmer]
+            self.nodes[exist_node_id].count += 1
+            self.merge_node_idx.add(exist_node_id)
+            return exist_node_id
         new_node = Node(self.id_count, kmer)
         self.nodes[self.id_count] = new_node
         if kmer not in ['$', '#']:
@@ -122,23 +130,20 @@ class deBruijn:
                 duplicate_kmer.add(key)
         return kmers_str
 
-    def add_sequences(self, seqs: SequenceCollection) -> List[List[int]]:
+    def add_sequences(self, seqs: SequenceCollection) -> None:
         """Construct de Bruijn graph for the given sequences
 
         Args:
             seqs (SequenceCollection): The SequenceCollection object that contains the sequences for de Bruijn graph
         """
         self.num_seq = seqs.num_seqs
-        # the list of list to record the node index for each sequence
-        seq_node_idx = []
-        # find the duplicate kmers in each sequence and add them to de Bruijn graph
+        # find the duplicate kmers in each sequence
         duplicate_kmer = set()
         # get kmers
         kmer_seqs = [
             self.__kmers(str(seq), duplicate_kmer, self.k)
             for seq in seqs.iter_seqs()
         ]
-
         # add nodes to de Bruijn graph
         for i, kmers in enumerate(kmer_seqs):
             # to record the duplicated kmers
@@ -147,7 +152,7 @@ class deBruijn:
                 if j == 0:
                     # starting node
                     new_node = self.__add_node("$")
-                    seq_node_idx.append([])
+                    self.seq_node_idx[i] = [new_node]
                 # store the previous node index
                 prev_node = new_node
                 if kmer in duplicate_kmer:
@@ -156,20 +161,25 @@ class deBruijn:
                 elif acc != '':
                     # if there are duplicated kmers, store them in the edge
                     new_node = self.__add_node(kmer)
-                    seq_node_idx[i].append(new_node)
+                    self.seq_node_idx[i].append(new_node)
                     self.__add_edge(prev_node, new_node, acc)
                     acc = ''
                 else:
                     # if there is no duplicated kmer, add new nodes
                     new_node = self.__add_node(kmer)
-                    seq_node_idx[i].append(new_node)
+                    self.seq_node_idx[i].append(new_node)
                     self.__add_edge(prev_node, new_node)
                 if j == len(kmers) - 1:
+                    # mark the last kmer
+                    if not acc:
+                        self.seq_end_idx.append(new_node)
+                    else:
+                        # if -1, the last kmer is shown as edge, should be read fully
+                        self.seq_end_idx.append(-1)
                     # create the terminal node and connect with the previous node
                     end_node = self.__add_node('#')
-                    self.__add_edge(new_node, end_node)
-        # return the indicies of nodes for each sequence
-        return seq_node_idx
+                    self.seq_node_idx[i].append(end_node)
+                    self.__add_edge(new_node, end_node, acc)
 
     def __nodes_DOT_repr(self) -> str:
         """Get the DOT representation of nodes in de Bruijn graph
@@ -232,5 +242,87 @@ class deBruijn:
         if cleanup:
             dot_file.unlink()
 
+    def __read_kmer(self, node_idx, seq_idx) -> str:
+        kmer = self.nodes[node_idx].kmer
+        return kmer if node_idx == self.seq_end_idx[seq_idx] else kmer[0]
+
+    # extract bubble kmers from the indices of nodes
+    def __extract_bubble(self, bubble_idx_seq: List[int], seq_idx) -> str:
+        rtn = []
+        for i in range(len(bubble_idx_seq) - 1):
+            node_idx = bubble_idx_seq[i]
+            node_kmer = self.nodes[node_idx].kmer
+            if node_kmer not in ['#', '$']:
+                rtn.append(self.__read_kmer(node_idx, seq_idx))
+            next_node_idx = bubble_idx_seq[i + 1]
+            # if the next node is '#' (end of sequence), read edge fully,
+            # otherwise, read the first char
+            if self.nodes[next_node_idx].kmer == '#':
+                rtn.append(
+                    self.nodes[node_idx].out_edges[next_node_idx].duplicate_str)
+            else:
+                edge_kmer = self.nodes[node_idx].out_edges[next_node_idx].duplicate_str
+                rtn.append(
+                    edge_kmer[0] if len(edge_kmer) > 0 else edge_kmer)
+        return ''.join(rtn)
+
+    # function to align the sequences in bubbles
+    def __bubble_aln(self, bubble1, bubble2):
+        bubble_seq1 = self.__extract_bubble(bubble1, 0)
+        bubble_seq2 = self.__extract_bubble(bubble2, 1)
+
+        # FIXME: When edge cases, one sequence can be empty, need a if statement for them
+        if bubble_seq1 and bubble_seq2:
+            seq_colllection = make_unaligned_seqs(
+                {0: bubble_seq1, 1: bubble_seq2}, moltype='dna')
+            partial_aln = global_pairwise(*seq_colllection.seqs, s, 10, 2)
+            return str(partial_aln.seqs[0]), str(partial_aln.seqs[1])
+
+        return '', ''
+
     def to_POA(self) -> None:
-        pass
+        seq1_idx, seq2_idx = 0, 0
+        seq1_res, seq2_res = [], []
+        for merge in self.merge_node_idx:
+            bubble_idx_seq1, bubble_idx_seq2 = [], []
+            while self.seq_node_idx[0][seq1_idx] != merge:
+                bubble_idx_seq1.append(self.seq_node_idx[0][seq1_idx])
+                seq1_idx += 1
+
+            while self.seq_node_idx[1][seq2_idx] != merge:
+                bubble_idx_seq2.append(self.seq_node_idx[1][seq2_idx])
+                seq2_idx += 1
+
+            bubble_idx_seq1.append(merge)
+            bubble_idx_seq2.append(merge)
+
+            bubble_alignment = self.__bubble_aln(
+                bubble_idx_seq1, bubble_idx_seq2)
+
+            seq1_res.extend([bubble_alignment[0], self.__read_kmer(merge, 0)])
+            seq2_res.extend([bubble_alignment[1], self.__read_kmer(merge, 1)])
+            seq1_idx += 1
+            seq2_idx += 1
+
+        # clean bubble_idx_seq
+        bubble_idx_seq1, bubble_idx_seq2 = [], []
+
+        while seq1_idx < len(self.seq_node_idx[0]):
+            bubble_idx_seq1.append(self.seq_node_idx[0][seq1_idx])
+            seq1_idx += 1
+
+        while seq2_idx < len(self.seq_node_idx[1]):
+            bubble_idx_seq2.append(self.seq_node_idx[1][seq2_idx])
+            seq2_idx += 1
+
+        bubble_alignment = self.__bubble_aln(bubble_idx_seq1, bubble_idx_seq2)
+
+        seq1_res.append(bubble_alignment[0])
+        seq2_res.append(bubble_alignment[1])
+
+        return ''.join(seq1_res), ''.join(seq2_res)
+
+
+d = deBruijn('~/repos/COMP3770-xingjian/data/ex1.fasta', 3)
+# d.visualize('./ex1.png')
+print(d.to_POA())
