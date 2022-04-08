@@ -1,7 +1,7 @@
+from typing import List, Set, Tuple
 from collections import Counter
 from pathlib import Path
 import subprocess
-from typing import List, Set
 
 from cogent3.align import global_pairwise, make_dna_scoring_dict
 from cogent3 import load_unaligned_seqs, make_unaligned_seqs
@@ -103,6 +103,7 @@ class deBruijn:
         if kmer in self.exist_kmer:
             exist_node_id = self.exist_kmer[kmer]
             self.nodes[exist_node_id].count += 1
+            # FIXME: If edge cases happen, the merge list is not the LCS of two node_idx list
             self.merge_node_idx.add(exist_node_id)
             return exist_node_id
         new_node = Node(self.id_count, kmer)
@@ -271,27 +272,32 @@ class deBruijn:
         bubble_seq1 = self.__extract_bubble(bubble1, 0)
         bubble_seq2 = self.__extract_bubble(bubble2, 1)
 
-        # FIXME: When edge cases, one sequence can be empty, need a if statement for them
         if bubble_seq1 and bubble_seq2:
             seq_colllection = make_unaligned_seqs(
                 {0: bubble_seq1, 1: bubble_seq2}, moltype='dna')
             partial_aln = global_pairwise(*seq_colllection.seqs, s, 10, 2)
             return str(partial_aln.seqs[0]), str(partial_aln.seqs[1])
+        elif bubble_seq1:
+            return bubble_seq1, '-' * len(bubble_seq1)
+        elif bubble_seq2:
+            return '-' * len(bubble_seq2), bubble_seq2
+        else:
+            return '', ''
 
-        return '', ''
-
-    def to_POA(self) -> None:
+    def to_POA(self) -> Tuple[str]:
         seq1_idx, seq2_idx = 0, 0
         seq1_res, seq2_res = [], []
         for merge in self.merge_node_idx:
             bubble_idx_seq1, bubble_idx_seq2 = [], []
-            while self.seq_node_idx[0][seq1_idx] != merge:
+            while seq1_idx < len(self.seq_node_idx[0]) and self.seq_node_idx[0][seq1_idx] != merge:
                 bubble_idx_seq1.append(self.seq_node_idx[0][seq1_idx])
                 seq1_idx += 1
 
-            while self.seq_node_idx[1][seq2_idx] != merge:
+            while seq2_idx < len(self.seq_node_idx[1]) and self.seq_node_idx[1][seq2_idx] != merge:
                 bubble_idx_seq2.append(self.seq_node_idx[1][seq2_idx])
                 seq2_idx += 1
+
+            # TODO: If index overflow here, it must be the edge case, call LCS function?
 
             bubble_idx_seq1.append(merge)
             bubble_idx_seq2.append(merge)
@@ -321,8 +327,3 @@ class deBruijn:
         seq2_res.append(bubble_alignment[1])
 
         return ''.join(seq1_res), ''.join(seq2_res)
-
-
-d = deBruijn('~/repos/COMP3770-xingjian/data/ex1.fasta', 3)
-# d.visualize('./ex1.png')
-print(d.to_POA())
