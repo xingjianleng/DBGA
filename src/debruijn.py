@@ -2,14 +2,43 @@ from typing import List, Set, Tuple
 from collections import Counter
 from pathlib import Path
 import subprocess
+import itertools
 
+import numpy as np
 from cogent3.align import global_pairwise, make_dna_scoring_dict
 from cogent3 import load_unaligned_seqs, make_unaligned_seqs
 from cogent3 import SequenceCollection
 
 
-# the scoring dict for aligning bubbles
+# scoring dict for aligning bubbles
 s = make_dna_scoring_dict(10, -1, -8)
+
+
+# longest common subsequence algorithm
+# TODO: Improve memory usage using Hirschberg algorithm
+def lcs(list1, list2):
+    score = np.zeros((len(list1) + 1, len(list2) + 1), dtype=np.int_)
+    for i, j in itertools.product(range(1, len(list1) + 1), range(1, len(list2) + 1)):
+        score[i, j] = score[i - 1, j - 1] + 1 \
+            if list1[i - 1] == list2[j - 1] else max(score[i - 1, j], score[i, j - 1])
+
+    longest_length = score[len(list1), len(list2)]
+    common_seq = [-1] * longest_length
+
+    idx1 = len(list1)
+    idx2 = len(list2)
+
+    while idx1 > 0 and idx2 > 0:
+        if list1[idx1 - 1] == list2[idx2 - 1]:
+            common_seq[longest_length - 1] = list1[idx1 - 1]
+            idx1 -= 1
+            idx2 -= 1
+            longest_length -= 1
+        elif score[idx1 - 1][idx2] > score[idx1][idx2 - 1]:
+            idx1 -= 1
+        else:
+            idx2 -= 1
+    return common_seq
 
 
 class Edge:
@@ -103,7 +132,6 @@ class deBruijn:
         if kmer in self.exist_kmer:
             exist_node_id = self.exist_kmer[kmer]
             self.nodes[exist_node_id].count += 1
-            # FIXME: If edge cases happen, the merge list is not the LCS of two node_idx list
             self.merge_node_idx.add(exist_node_id)
             return exist_node_id
         new_node = Node(self.id_count, kmer)
@@ -201,7 +229,8 @@ class deBruijn:
         rtn = []
         for index, node in enumerate(self.nodes.values()):
             for other_node, edge in node.out_edges.items():
-                current_row = f'\t{node.id} -> {other_node} [label="{edge.duplicate_str}", weight={edge.multiplicity}];'
+                current_row = f'\t{node.id} -> {other_node} \
+                    [label="{edge.duplicate_str}", weight={edge.multiplicity}];'
                 if index != len(self.nodes) - 1:
                     current_row += '\n'
                 rtn.append(current_row)
@@ -297,7 +326,11 @@ class deBruijn:
                 bubble_idx_seq2.append(self.seq_node_idx[1][seq2_idx])
                 seq2_idx += 1
 
-            # TODO: If index overflow here, it must be the edge case, call LCS function?
+            # if index overflow here, it must be the edge case, call LCS function
+            if seq1_idx == len(self.seq_node_idx[0]) or seq2_idx == len(self.seq_node_idx[1]):
+                self.merge_node_idx = lcs(
+                    self.seq_node_idx[0], self.seq_node_idx[1])
+                return self.to_POA()
 
             bubble_idx_seq1.append(merge)
             bubble_idx_seq2.append(merge)
