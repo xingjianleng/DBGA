@@ -120,7 +120,7 @@ class deBruijn:
         else:
             raise ValueError('Invalid input type for sequence argument')
 
-    def __add_node(self, kmer: str) -> int:
+    def _add_node(self, kmer: str) -> int:
         """Add a single node to the de Bruijn graph
 
         Args:
@@ -141,7 +141,7 @@ class deBruijn:
         self.id_count += 1
         return self.id_count - 1
 
-    def __add_edge(self, out_id: int, in_id: int, duplicate_str: str = '') -> None:
+    def _add_edge(self, out_id: int, in_id: int, duplicate_str: str = '') -> None:
         """Connect two kmers in the de Bruijn graph with an edge
 
         Args:
@@ -151,7 +151,7 @@ class deBruijn:
         """
         self.nodes[out_id].add_out_edge(in_id, duplicate_str=duplicate_str)
 
-    def __kmers(self, sequence: str, duplicate_kmer: Set, k: int) -> List[str]:
+    def _kmers(self, sequence: str, duplicate_kmer: Set, k: int) -> List[str]:
         kmers_str = [sequence[i: i + k] for i in range(len(sequence) - k + 1)]
         counter = Counter(kmers_str)
         for key, value in counter.items():
@@ -170,7 +170,7 @@ class deBruijn:
         duplicate_kmer = set()
         # get kmers
         kmer_seqs = [
-            self.__kmers(str(seq), duplicate_kmer, self.k)
+            self._kmers(str(seq), duplicate_kmer, self.k)
             for seq in seqs.iter_seqs()
         ]
         # add nodes to de Bruijn graph
@@ -180,7 +180,7 @@ class deBruijn:
             for j, kmer in enumerate(kmers):
                 if j == 0:
                     # starting node
-                    new_node = self.__add_node("$")
+                    new_node = self._add_node("$")
                     self.seq_node_idx[i] = [new_node]
                 # store the previous node index
                 prev_node = new_node
@@ -189,15 +189,15 @@ class deBruijn:
                     new_node = prev_node
                 elif acc != '':
                     # if there are duplicated kmers, store them in the edge
-                    new_node = self.__add_node(kmer)
+                    new_node = self._add_node(kmer)
                     self.seq_node_idx[i].append(new_node)
-                    self.__add_edge(prev_node, new_node, acc)
+                    self._add_edge(prev_node, new_node, acc)
                     acc = ''
                 else:
                     # if there is no duplicated kmer, add new nodes
-                    new_node = self.__add_node(kmer)
+                    new_node = self._add_node(kmer)
                     self.seq_node_idx[i].append(new_node)
-                    self.__add_edge(prev_node, new_node)
+                    self._add_edge(prev_node, new_node)
                 if j == len(kmers) - 1:
                     # mark the last kmer
                     if not acc:
@@ -206,11 +206,11 @@ class deBruijn:
                         # if -1, the last kmer is shown as edge, should be read fully
                         self.seq_end_idx.append(-1)
                     # create the terminal node and connect with the previous node
-                    end_node = self.__add_node('#')
+                    end_node = self._add_node('#')
                     self.seq_node_idx[i].append(end_node)
-                    self.__add_edge(new_node, end_node, acc)
+                    self._add_edge(new_node, end_node, acc)
 
-    def __nodes_DOT_repr(self) -> str:
+    def _nodes_DOT_repr(self) -> str:
         """Get the DOT representation of nodes in de Bruijn graph
 
         Returns:
@@ -220,7 +220,7 @@ class deBruijn:
             f'\t{node.id} [label="{node.kmer}"];\n' for node in self.nodes.values()]
         return "".join(rtn)
 
-    def __edges_DOT_repr(self) -> str:
+    def _edges_DOT_repr(self) -> str:
         """Get the DOT representation of edges in de Bruijn graph
 
         Returns:
@@ -236,7 +236,7 @@ class deBruijn:
                 rtn.append(current_row)
         return ''.join(rtn)
 
-    def __to_DOT(self, path: Path) -> None:
+    def _to_DOT(self, path: Path) -> None:
         """Write the DOT representation to the file
 
         Args:
@@ -244,8 +244,8 @@ class deBruijn:
         """
         with open(path, 'w', encoding='utf-8') as f:
             f.write("digraph debuijn {\n")
-            f.write(self.__nodes_DOT_repr())
-            f.write(self.__edges_DOT_repr())
+            f.write(self._nodes_DOT_repr())
+            f.write(self._edges_DOT_repr())
             f.write('}')
 
     def visualize(self, path: str, cleanup: bool = False) -> None:
@@ -263,7 +263,7 @@ class deBruijn:
         if suffix not in ['pdf', 'png', 'svg']:
             raise ValueError("Not supported file format")
         dot_file = file_path.with_suffix(".DOT")
-        self.__to_DOT(dot_file)
+        self._to_DOT(dot_file)
         subprocess.run(
             f'dot -T{suffix} {dot_file.__str__()} -o {file_path.__str__()}',
             shell=True,
@@ -272,18 +272,18 @@ class deBruijn:
         if cleanup:
             dot_file.unlink()
 
-    def __read_kmer(self, node_idx, seq_idx) -> str:
+    def _read_kmer(self, node_idx, seq_idx) -> str:
         kmer = self.nodes[node_idx].kmer
         return kmer if node_idx == self.seq_end_idx[seq_idx] else kmer[0]
 
     # extract bubble kmers from the indices of nodes
-    def __extract_bubble(self, bubble_idx_seq: List[int], seq_idx) -> str:
+    def _extract_bubble(self, bubble_idx_seq: List[int], seq_idx) -> str:
         rtn = []
         for i in range(len(bubble_idx_seq) - 1):
             node_idx = bubble_idx_seq[i]
             node_kmer = self.nodes[node_idx].kmer
             if node_kmer not in ['#', '$']:
-                rtn.append(self.__read_kmer(node_idx, seq_idx))
+                rtn.append(self._read_kmer(node_idx, seq_idx))
             next_node_idx = bubble_idx_seq[i + 1]
             # if the next node is '#' (end of sequence), read edge fully,
             # otherwise, read the first char
@@ -297,9 +297,9 @@ class deBruijn:
         return ''.join(rtn)
 
     # function to align the sequences in bubbles
-    def __bubble_aln(self, bubble1, bubble2):
-        bubble_seq1 = self.__extract_bubble(bubble1, 0)
-        bubble_seq2 = self.__extract_bubble(bubble2, 1)
+    def _bubble_aln(self, bubble1, bubble2):
+        bubble_seq1 = self._extract_bubble(bubble1, 0)
+        bubble_seq2 = self._extract_bubble(bubble2, 1)
 
         if bubble_seq1 and bubble_seq2:
             seq_colllection = make_unaligned_seqs(
@@ -335,11 +335,11 @@ class deBruijn:
             bubble_idx_seq1.append(merge)
             bubble_idx_seq2.append(merge)
 
-            bubble_alignment = self.__bubble_aln(
+            bubble_alignment = self._bubble_aln(
                 bubble_idx_seq1, bubble_idx_seq2)
 
-            seq1_res.extend([bubble_alignment[0], self.__read_kmer(merge, 0)])
-            seq2_res.extend([bubble_alignment[1], self.__read_kmer(merge, 1)])
+            seq1_res.extend([bubble_alignment[0], self._read_kmer(merge, 0)])
+            seq2_res.extend([bubble_alignment[1], self._read_kmer(merge, 1)])
             seq1_idx += 1
             seq2_idx += 1
 
@@ -354,7 +354,7 @@ class deBruijn:
             bubble_idx_seq2.append(self.seq_node_idx[1][seq2_idx])
             seq2_idx += 1
 
-        bubble_alignment = self.__bubble_aln(bubble_idx_seq1, bubble_idx_seq2)
+        bubble_alignment = self._bubble_aln(bubble_idx_seq1, bubble_idx_seq2)
 
         seq1_res.append(bubble_alignment[0])
         seq2_res.append(bubble_alignment[1])
