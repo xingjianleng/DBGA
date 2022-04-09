@@ -104,7 +104,7 @@ class deBruijn:
         self.nodes = {}
         self.exist_kmer = {}
         self.seq_node_idx = {}
-        self.merge_node_idx = set()
+        self.merge_node_idx = []
         self.seq_end_idx = []
         if isinstance(sequence, str):
             path = Path(sequence).expanduser().absolute()
@@ -132,7 +132,7 @@ class deBruijn:
         if kmer in self.exist_kmer:
             exist_node_id = self.exist_kmer[kmer]
             self.nodes[exist_node_id].count += 1
-            self.merge_node_idx.add(exist_node_id)
+            self.merge_node_idx.append(exist_node_id)
             return exist_node_id
         new_node = Node(self.id_count, kmer)
         self.nodes[self.id_count] = new_node
