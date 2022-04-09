@@ -10,19 +10,19 @@ class DeBruijnTest(unittest.TestCase):
         for elem in input_list:
             self.assertIn(elem, input_set)
 
-    def __check_kmer_length(self, debruijn: deBruijn):
+    def _check_kmer_length(self, debruijn: deBruijn):
         for node in debruijn.nodes.values():
             if node.kmer not in ['#', '$']:
                 self.assertEqual(len(node.kmer), debruijn.k)
 
-    def __debruijn_w_basic_check(self, arg0):
+    def _debruijn_w_basic_check(self, arg0):
         result = deBruijn(arg0, 3)
-        self.__check_kmer_length(result)
+        self._check_kmer_length(result)
         self.assertEqual(result.num_seq, 2)
         return result
 
     def test_ex1(self):
-        d = self.__debruijn_w_basic_check('./tests/data/ex1.fasta')
+        d = self._debruijn_w_basic_check('./tests/data/ex1.fasta')
         self.assertListEqual(
             d.seq_node_idx[0], list(range(10))
         )
@@ -35,7 +35,7 @@ class DeBruijnTest(unittest.TestCase):
         self.assertTupleEqual(d.to_POA(), ("GTACAAGCGA", "GTACACGCGA"))
 
     def test_ex2(self):
-        d = self.__debruijn_w_basic_check('./tests/data/ex2.fasta')
+        d = self._debruijn_w_basic_check('./tests/data/ex2.fasta')
         self.assertListEqual(
             d.seq_node_idx[0], list(range(10))
         )
@@ -48,7 +48,7 @@ class DeBruijnTest(unittest.TestCase):
         self.assertTupleEqual(d.to_POA(), ("GTACACGCTA", "GTACACGCGA"))
 
     def test_ex3(self):
-        d = self.__debruijn_w_basic_check('./tests/data/ex3.fasta')
+        d = self._debruijn_w_basic_check('./tests/data/ex3.fasta')
         # caused by duplicated kmers
         self.assertListEqual(
             d.seq_node_idx[0], list(range(9))
@@ -62,7 +62,7 @@ class DeBruijnTest(unittest.TestCase):
         self.assertTupleEqual(d.to_POA(), ("GTACACGTATG", "GTACACG-ATG"))
 
     def test_ex4(self):
-        d = self.__debruijn_w_basic_check('./tests/data/ex4.fasta')
+        d = self._debruijn_w_basic_check('./tests/data/ex4.fasta')
         self.assertListEqual(
             d.seq_node_idx[0], list(range(10))
         )
@@ -79,7 +79,7 @@ class DeBruijnTest(unittest.TestCase):
         )
 
     def test_ex5(self):
-        d = self.__debruijn_w_basic_check('./tests/data/ex5.fasta')
+        d = self._debruijn_w_basic_check('./tests/data/ex5.fasta')
         self.assertListEqual(
             d.seq_node_idx[0], list(range(7))
         )
