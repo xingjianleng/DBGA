@@ -15,9 +15,16 @@ from cogent3 import SequenceCollection
 s = make_dna_scoring_dict(10, -1, -8)
 
 
-# longest common subsequence algorithm
 # TODO: Improve memory usage using Hirschberg algorithm
-def lcs(list1, list2):
+def lcs(list1: list, list2: list) -> list:
+    """Find the longest common subsequence of two lists
+
+    Args:
+        list1 (list): the first input list
+        list2 (list): the second input list
+    Returns:
+        list: the list containing longest common subsequence
+    """
     score = np.zeros((len(list1) + 1, len(list2) + 1), dtype=np.int_)
     for i, j in itertools.product(range(1, len(list1) + 1), range(1, len(list2) + 1)):
         score[i, j] = score[i - 1, j - 1] + 1 \
@@ -42,8 +49,19 @@ def lcs(list1, list2):
     return common_seq
 
 
-# load the sequences and transform it into numpy array of strings (in Unicode)
 def load_sequences(sequences, moltype: str = 'dna') -> np.ndarray:
+    """Load the sequences and transform it into numpy array of strings (in Unicode)
+
+    Args:
+        sequences : sequences to load, could be `path`, `SequenceCollection`, `list`
+        moltype (str, optional): _description_. Defaults to 'dna'.
+
+    Raises:
+        TypeError: if the sequences parameter is not `path`, `SequenceCollection`, `list`
+
+    Returns:
+        np.ndarray: the numpy array containing the loaded sequences
+    """
     if isinstance(sequences, str):
         path = Path(sequences).expanduser().absolute()
         sequences = load_unaligned_seqs(path, moltype=moltype)
@@ -53,18 +71,37 @@ def load_sequences(sequences, moltype: str = 'dna') -> np.ndarray:
     elif isinstance(sequences, list) and all(isinstance(elem, str) for elem in sequences):
         return np.array(sequences)
     else:
-        raise ValueError('Invalid input type for sequence argument')
+        raise TypeError('Invalid input type for sequence argument')
 
 
-# find the kmers in sequences
 def get_kmers(sequence: str, k: int) -> List[str]:
+    """Get the kmers in sequences
+
+    Args:
+        sequence (str): the sequence for calculating kmers
+        k (int): k size for each kmer
+
+    Raises:
+        ValueError: the k value should be in [1, len(sequence)]
+
+    Returns:
+        List[str]: the list of kmers of the sequence
+    """
     if k < 0 or k > len(sequence):
         raise ValueError('Invalid k size for kmers')
     return [sequence[i: i + k] for i in range(len(sequence) - k + 1)]
 
 
-# find the duplicated kmers in each sequence
 def duplicate_kmers(kmer_seqs: List[List[str]]) -> Set[str]:
+    """Get the duplicate kmers from each sequence
+
+    Args:
+        kmer_seqs (List[List[str]]): list of kmers for each sequence
+
+    Returns:
+        Set[str]: the set containing duplicate kmers
+    """
+    assert len(kmer_seqs) == 2
     duplicate_set = set()
     for kmer_seq in kmer_seqs:
         counter = Counter(kmer_seq)
@@ -74,8 +111,33 @@ def duplicate_kmers(kmer_seqs: List[List[str]]) -> Set[str]:
     return duplicate_set
 
 
+def global_aln(seq1: str, seq2: str) -> Tuple[str]:
+    """Align the sequences in bubbles with node indices provided
+
+    Args:
+        seq1 (str): the first sequence to align
+        seq2 (str): the second sequence to align
+
+    Returns:
+        Tuple[str]: the tuple of aligned sequences
+    """
+    if seq1 and seq2:
+        seq_colllection = make_unaligned_seqs(
+            {0: seq1, 1: seq2}, moltype='dna')
+        partial_aln = global_pairwise(*seq_colllection.seqs, s, 10, 2)
+        return str(partial_aln.seqs[0]), str(partial_aln.seqs[1])
+    elif seq1:
+        return seq1, '-' * len(seq1)
+    elif seq2:
+        return '-' * len(seq2), seq2
+    else:
+        return '', ''
+
+
 # Enum type of different NodeTypes
 class NodeType(Enum):
+    """NodeType class to indicate the type of node (start/middle/end)
+    """
     start = auto()
     middle = auto()
     end = auto()
@@ -136,7 +198,7 @@ class deBruijn:
         """Constructor for a de Bruijn graph
 
         Args:
-            sequence (Any): can be path to sequences or List of sequences or SequenceCollection objects
+            sequence (Any): can be path to sequences or List of sequences or SequenceCollection object
             k (int): the kmer size for the de Bruijn graph
         """
         self.id_count = 0
@@ -187,7 +249,16 @@ class deBruijn:
         """
         self.nodes[out_id].add_out_edge(in_id, duplicate_str=duplicate_str)
 
-    def _get_seq_kmer_idx(self, kmers: List[str], duplicate_kmer: Set[str]):
+    def _get_seq_kmer_idx(self, kmers: List[str], duplicate_kmer: Set[str]) -> List[int]:
+        """Add kmers (of a sequence) to the de Bruijn graph, also get their indices
+
+        Args:
+            kmers (List[str]): kmers of a sequence 
+            duplicate_kmer (Set[str]): kmers where they are recorded to be duplicate (not included in nodes)
+
+        Returns:
+            List[int]: the indices of nodes where kmers are added
+        """
         # to record the duplicated kmers
         cycle_kmer = []
         # starting node
@@ -305,17 +376,36 @@ class deBruijn:
         if cleanup:
             dot_file.unlink()
 
-    def _read_kmer(self, node_idx: int, seq_idx: int) -> str:
+    def _read_from_kmer(self, node_idx: int, seq_idx: int) -> str:
+        """Read nucleotide(s) from the kmer with provided index
+
+        Args:
+            node_idx (int): the node index of the kmer to read
+            seq_idx (int): the sequence index from kmer
+
+        Returns:
+            str: the nucleotide(s) read from the kmer
+        """
+        assert seq_idx in {0, 1}
         kmer = self.nodes[node_idx].kmer
         return kmer if node_idx == self.seq_last_kmer_idx[seq_idx] else kmer[0]
 
-    # extract bubble kmers from the indices of nodes
     def _extract_bubble(self, bubble_idx_seq: List[int], seq_idx: int) -> str:
+        """Extract the string from the bubble from indices of nodes
+
+        Args:
+            bubble_idx_seq (List[int]): indices of nodes that are in the bubble
+            seq_idx (int): the sequence index the bubble belongs to
+
+        Returns:
+            str: the string from the bubble from indices of nodes
+        """
+        assert seq_idx in {0, 1}
         rtn = []
         for i in range(len(bubble_idx_seq) - 1):
             node_idx = bubble_idx_seq[i]
             if self.nodes[node_idx].node_type not in [NodeType.start, NodeType.end]:
-                rtn.append(self._read_kmer(node_idx, seq_idx))
+                rtn.append(self._read_from_kmer(node_idx, seq_idx))
             next_node_idx = bubble_idx_seq[i + 1]
             # if the next node is the end of sequence, read edge fully,
             # otherwise, read the first char
@@ -328,24 +418,12 @@ class deBruijn:
                     edge_kmer[0] if len(edge_kmer) > 0 else edge_kmer)
         return ''.join(rtn)
 
-    # function to align the sequences in bubbles with node indices provided
-    def _bubble_aln(self, bubble1, bubble2):
-        bubble_seq1 = self._extract_bubble(bubble1, 0)
-        bubble_seq2 = self._extract_bubble(bubble2, 1)
-
-        if bubble_seq1 and bubble_seq2:
-            seq_colllection = make_unaligned_seqs(
-                {0: bubble_seq1, 1: bubble_seq2}, moltype='dna')
-            partial_aln = global_pairwise(*seq_colllection.seqs, s, 10, 2)
-            return str(partial_aln.seqs[0]), str(partial_aln.seqs[1])
-        elif bubble_seq1:
-            return bubble_seq1, '-' * len(bubble_seq1)
-        elif bubble_seq2:
-            return '-' * len(bubble_seq2), bubble_seq2
-        else:
-            return '', ''
-
     def to_Alignment(self) -> Tuple[str]:
+        """Use de Bruijn graph to align two sequences
+
+        Returns:
+            Tuple[str]: the tuple of aligned sequences
+        """
         seq1_idx, seq2_idx = 0, 0
         seq1_res, seq2_res = [], []
         for merge_idx in self.merge_node_idx:
@@ -367,15 +445,14 @@ class deBruijn:
             bubble_idx_seq1.append(merge_idx)
             bubble_idx_seq2.append(merge_idx)
 
-            bubble_alignment = self._bubble_aln(
-                bubble_idx_seq1,
-                bubble_idx_seq2
-            )
+            bubble_seq1_str = self._extract_bubble(bubble_idx_seq1, 0)
+            bubble_seq2_str = self._extract_bubble(bubble_idx_seq2, 1)
+            bubble_alignment = global_aln(bubble_seq1_str, bubble_seq2_str)
 
             seq1_res.extend(
-                [bubble_alignment[0], self._read_kmer(merge_idx, 0)])
+                [bubble_alignment[0], self._read_from_kmer(merge_idx, 0)])
             seq2_res.extend(
-                [bubble_alignment[1], self._read_kmer(merge_idx, 1)])
+                [bubble_alignment[1], self._read_from_kmer(merge_idx, 1)])
             seq1_idx += 1
             seq2_idx += 1
 
@@ -390,7 +467,9 @@ class deBruijn:
             bubble_idx_seq2.append(self.seq_node_idx[1][seq2_idx])
             seq2_idx += 1
 
-        bubble_alignment = self._bubble_aln(bubble_idx_seq1, bubble_idx_seq2)
+        bubble_seq1_str = self._extract_bubble(bubble_idx_seq1, 0)
+        bubble_seq2_str = self._extract_bubble(bubble_idx_seq2, 1)
+        bubble_alignment = global_aln(bubble_seq1_str, bubble_seq2_str)
 
         seq1_res.append(bubble_alignment[0])
         seq2_res.append(bubble_alignment[1])
