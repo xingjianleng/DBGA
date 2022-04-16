@@ -1,6 +1,6 @@
 import pytest
 
-from src.debruijn import NodeType, deBruijn, duplicate_kmers, get_kmers, lcs
+from src.debruijn import NodeType, deBruijn, duplicate_kmers, get_kmers, global_aln, lcs
 
 
 def kmer_length_checker(debruijn: deBruijn):
@@ -14,6 +14,21 @@ def test_lcs():
     lst2 = ['A', 'C', 'D', 'B', 'A', 'C']
     lcs_result = lcs(lst1, lst2)
     assert lcs_result == ['C', 'D', 'A', 'C']
+
+
+def test_global_aln():
+    seq1 = ''
+    seq2 = 'ACG'
+    assert global_aln(seq1=seq1, seq2=seq2) == ('---', 'ACG')
+    seq1 = 'CTA'
+    seq2 = ''
+    assert global_aln(seq1=seq1, seq2=seq2) == ('CTA', '---')
+    seq1 = 'GGATCGA'
+    seq2 = 'GAATTCAGTTA'
+    assert global_aln(seq1=seq1, seq2=seq2) in [
+        ('GGA-TC-G--A', 'GAATTCAGTTA'),
+        ('GGAT-C-G--A', 'GAATTCAGTTA')
+    ]
 
 
 def test_get_kmers():
