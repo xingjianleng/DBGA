@@ -3,6 +3,10 @@ import pytest
 from src.debruijn import NodeType, deBruijn, duplicate_kmers, get_kmers, global_aln, lcs
 
 
+def monotomic_inc(lst: list):
+    return all(x < y for x, y in zip(lst, lst[1:]))
+
+
 def kmer_length_checker(debruijn: deBruijn):
     for node in debruijn.nodes.values():
         if node.node_type not in [NodeType.start, NodeType.end]:
@@ -93,11 +97,15 @@ def example_checker(
     db = deBruijn(path, k)
     exp_start_idx = [indices[0] for indices in [exp_seq1_idx, exp_seq2_idx]]
     exp_end_idx = [indices[-1] for indices in [exp_seq1_idx, exp_seq2_idx]]
+    # sequences should be the same
     assert db.sequences[0] == exp_seq1
     assert db.sequences[1] == exp_seq2
+    # node Ids should be consistent with expected Ids
     assert db.seq_node_idx[0] == exp_seq1_idx
     assert db.seq_node_idx[1] == exp_seq2_idx
+    # merge node Ids should be the same as expectation, it should also be monotomic increasing
     assert db.merge_node_idx == exp_merge
+    assert monotomic_inc(db.merge_node_idx)
     for i in range(db.id_count):
         if i in exp_start_idx:
             assert db.nodes[i].node_type is NodeType.start
@@ -183,6 +191,42 @@ def test_ex5():
         exp_seq2_idx=[7, 1, 2, 8, 9, 10],
         exp_merge=[1, 2],
         exp_aln=[("ACGTAGACG", "ACGTA-ACG")]
+    )
+
+
+@pytest.mark.skip(reason='Bug not fixed')
+def test_edge_case1():
+    # seq1: TACCACGTAAT
+    # seq2: TACGACCTAAT
+    example_checker(
+        path='./tests/data/edge_case1.fasta',
+        k=3,
+        exp_seq1='TACCACGTAAT',
+        exp_seq2='TACGACCTAAT',
+        exp_seq1_idx=list(range(11)),
+        exp_seq2_idx=[11, 1, 5, 12, 13, 2, 14, 15, 8, 9, 16],
+        exp_merge=[1, 8, 9],
+        exp_aln=[("TACCACGTAAT", "TACGACCTAAT")]
+    )
+
+
+@pytest.mark.skip(reason='Bug not fixed')
+def test_edge_case2():
+    # seq1: TACCGTCCAGACGTAAT
+    # seq2: TACGGTCCAGACCTAAT
+    example_checker(
+        path='./tests/data/edge_case2.fasta',
+        k=3,
+        exp_seq1='TACCGTCCAGACGTAAT',
+        exp_seq2='TACGGTCCAGACCTAAT',
+        exp_seq1_idx=list(range(15)),
+        exp_seq2_idx=[
+            15, 1, 10, 16, 17, 4, 5, 6, 7, 8, 9, 2, 18, 19, 12, 13, 20
+        ],
+        exp_merge=[1, 4, 5, 6, 7, 8, 9, 12, 13],
+        exp_aln=[(
+            "TACCGTCCAGACGTAAT", "TACGGTCCAGACCTAAT"
+        )]
     )
 
 
