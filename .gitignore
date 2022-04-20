@@ -1,2 +1,3 @@
 /data/
+.coverage
 **/__pycache__

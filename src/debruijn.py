@@ -15,6 +15,49 @@ from cogent3 import SequenceCollection
 s = make_dna_scoring_dict(10, -1, -8)
 
 
+def balancing_aln_seqs(seq1: str, seq2: str) -> Tuple[str]:
+    """Helper function to compensate the edge case where one sequence has further end than the other
+
+    Args:
+        seq1 (str): the first aligned sequence
+        seq2 (str): the second aligned sqeuence
+
+    Raises:
+        ValueError: get invalid aligned sequence 1
+        ValueError: get invalid aligned sequence 2
+
+    Returns:
+        Tuple[str]: two aligned sequences without extra gaps at the end
+    """
+    if len(seq1) == len(seq2):
+        return seq1, seq2
+    elif len(seq1) > len(seq2):
+        difference_len = len(seq1) - len(seq2)
+        if seq1[-difference_len:] != ''.join(difference_len * ['-']):
+            raise ValueError('Input sequences are not appropriately aligned in sequence 1!')
+        return seq1[:-difference_len], seq2
+    else:
+        difference_len = len(seq2) - len(seq1)
+        if seq2[-difference_len:] != ''.join(difference_len * ['-']):
+            raise ValueError('Input sequences are not appropriately aligned in sequence 2!')
+        return seq1, seq2[:-difference_len]
+
+
+def read_debruijn_edge_kmer(seq: str, k: int) -> str:
+    """Read the kmer(s) contained in edges in a de Bruijn graph
+
+    Args:
+        seq (str): the duplicate string sequence from edges of de Bruijn graph
+        k (int): the kmer size of de Bruijn graph
+
+    Returns:
+        str: the edge kmer read
+    """
+    assert len(seq) % k == 0
+    rtn = [seq[i] for i in range(0, len(seq), k)]
+    return ''.join(rtn)
+
+
 # TODO: Improve memory usage using Hirschberg algorithm
 def lcs(list1: list, list2: list) -> list:
     """Find the longest common subsequence of two lists
@@ -409,13 +452,11 @@ class deBruijn:
             next_node_idx = bubble_idx_seq[i + 1]
             # if the next node is the end of sequence, read edge fully,
             # otherwise, read the first char
+            edge_kmer = self.nodes[node_idx].out_edges[next_node_idx].duplicate_str
             if self.nodes[next_node_idx].node_type is NodeType.end:
-                rtn.append(
-                    self.nodes[node_idx].out_edges[next_node_idx].duplicate_str)
+                rtn.append(edge_kmer)
             else:
-                edge_kmer = self.nodes[node_idx].out_edges[next_node_idx].duplicate_str
-                rtn.append(
-                    edge_kmer[0] if len(edge_kmer) > 0 else edge_kmer)
+                rtn.append(read_debruijn_edge_kmer(edge_kmer, self.k))
         return ''.join(rtn)
 
     def to_Alignment(self) -> Tuple[str]:
@@ -426,6 +467,8 @@ class deBruijn:
         """
         seq1_idx, seq2_idx = 0, 0
         seq1_res, seq2_res = [], []
+        merge_edge_read_seq1, merge_edge_read_seq2 = '', ''
+
         for merge_idx in self.merge_node_idx:
             bubble_idx_seq1, bubble_idx_seq2 = [], []
             while seq1_idx < len(self.seq_node_idx[0]) and self.seq_node_idx[0][seq1_idx] != merge_idx:
@@ -445,14 +488,30 @@ class deBruijn:
             bubble_idx_seq1.append(merge_idx)
             bubble_idx_seq2.append(merge_idx)
 
-            bubble_seq1_str = self._extract_bubble(bubble_idx_seq1, 0)
-            bubble_seq2_str = self._extract_bubble(bubble_idx_seq2, 1)
+            bubble_seq1_str = merge_edge_read_seq1 + \
+                self._extract_bubble(bubble_idx_seq1, 0)
+            bubble_seq2_str = merge_edge_read_seq2 + \
+                self._extract_bubble(bubble_idx_seq2, 1)
             bubble_alignment = global_aln(bubble_seq1_str, bubble_seq2_str)
 
             seq1_res.extend(
                 [bubble_alignment[0], self._read_from_kmer(merge_idx, 0)])
             seq2_res.extend(
                 [bubble_alignment[1], self._read_from_kmer(merge_idx, 1)])
+
+            # TODO: Refactor
+            seq1_curr_idx = self.seq_node_idx[0][seq1_idx]
+            seq1_next_idx = self.seq_node_idx[0][seq1_idx + 1]
+            seq2_curr_idx = self.seq_node_idx[1][seq2_idx]
+            seq2_next_idx = self.seq_node_idx[1][seq2_idx + 1]
+            merge_edge_read_seq1 = read_debruijn_edge_kmer(
+                self.nodes[seq1_curr_idx].out_edges[seq1_next_idx].duplicate_str,
+                self.k
+            )
+            merge_edge_read_seq2 = read_debruijn_edge_kmer(
+                self.nodes[seq2_curr_idx].out_edges[seq2_next_idx].duplicate_str,
+                self.k
+            )
             seq1_idx += 1
             seq2_idx += 1
 
@@ -467,11 +526,13 @@ class deBruijn:
             bubble_idx_seq2.append(self.seq_node_idx[1][seq2_idx])
             seq2_idx += 1
 
-        bubble_seq1_str = self._extract_bubble(bubble_idx_seq1, 0)
-        bubble_seq2_str = self._extract_bubble(bubble_idx_seq2, 1)
+        bubble_seq1_str = merge_edge_read_seq1 + \
+            self._extract_bubble(bubble_idx_seq1, 0)
+        bubble_seq2_str = merge_edge_read_seq2 + \
+            self._extract_bubble(bubble_idx_seq2, 1)
         bubble_alignment = global_aln(bubble_seq1_str, bubble_seq2_str)
 
         seq1_res.append(bubble_alignment[0])
         seq2_res.append(bubble_alignment[1])
 
-        return ''.join(seq1_res), ''.join(seq2_res)
+        return balancing_aln_seqs(''.join(seq1_res), ''.join(seq2_res))
