@@ -499,19 +499,27 @@ class deBruijn:
             seq2_res.extend(
                 [bubble_alignment[1], self._read_from_kmer(merge_idx, 1)])
 
-            # TODO: Refactor
+            # TODO: Refactor the code block, can extract a separate function
             seq1_curr_idx = self.seq_node_idx[0][seq1_idx]
             seq1_next_idx = self.seq_node_idx[0][seq1_idx + 1]
             seq2_curr_idx = self.seq_node_idx[1][seq2_idx]
             seq2_next_idx = self.seq_node_idx[1][seq2_idx + 1]
-            merge_edge_read_seq1 = read_debruijn_edge_kmer(
-                self.nodes[seq1_curr_idx].out_edges[seq1_next_idx].duplicate_str,
-                self.k
-            )
-            merge_edge_read_seq2 = read_debruijn_edge_kmer(
-                self.nodes[seq2_curr_idx].out_edges[seq2_next_idx].duplicate_str,
-                self.k
-            )
+            seq1_edge_kmer = self.nodes[seq1_curr_idx].out_edges[seq1_next_idx].duplicate_str
+            seq2_edge_kmer = self.nodes[seq2_curr_idx].out_edges[seq2_next_idx].duplicate_str
+            if self.nodes[seq1_next_idx].node_type is NodeType.end:
+                merge_edge_read_seq1 = seq1_edge_kmer
+            else:
+                merge_edge_read_seq1 = read_debruijn_edge_kmer(
+                    seq1_edge_kmer,
+                    self.k
+                )
+            if self.nodes[seq2_next_idx].node_type is NodeType.end:
+                merge_edge_read_seq2 = seq2_edge_kmer
+            else:
+                merge_edge_read_seq2 = read_debruijn_edge_kmer(
+                    seq2_edge_kmer,
+                    self.k
+                )
             seq1_idx += 1
             seq2_idx += 1
 

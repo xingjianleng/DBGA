@@ -323,6 +323,25 @@ def test_ex6():
     )
 
 
+def test_ex7():
+    # NOTE: Very comprehensive test, duplicate kmers (anywhere, even after merge node), unbalanced ends
+    #       Sequence end by duplicate kmer
+    # seq1: TGTACGTCAATGTCG
+    # seq2: TGTAAGTCAATGT
+    example_checker(
+        path='./tests/data/ex7.fasta',
+        k=3,
+        exp_seq1='TGTACGTCAATGTCG',
+        exp_seq2='TGTAAGTCAATGT',
+        exp_seq1_idx=list(range(11)),
+        exp_seq2_idx=[
+            11, 1, 12, 13, 14, 5, 6, 7, 8, 15
+        ],
+        exp_merge=[1, 5, 6, 7, 8],
+        exp_aln=[("TGTACGTCAATGTCG", "TGTAAGTCAATGT--")]
+    )
+
+
 @pytest.mark.xfail(reason="Algorithm can't tackle with this edge case!")
 def test_edge_case1():
     # NOTE: Duplicate kmer at different position of different sequences lead to cycles
