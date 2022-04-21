@@ -34,12 +34,14 @@ def balancing_aln_seqs(seq1: str, seq2: str) -> Tuple[str]:
     elif len(seq1) > len(seq2):
         difference_len = len(seq1) - len(seq2)
         if seq1[-difference_len:] != ''.join(difference_len * ['-']):
-            raise ValueError('Input sequences are not appropriately aligned in sequence 1!')
+            raise ValueError(
+                'Input sequences are not appropriately aligned in sequence 1!')
         return seq1[:-difference_len], seq2
     else:
         difference_len = len(seq2) - len(seq1)
         if seq2[-difference_len:] != ''.join(difference_len * ['-']):
-            raise ValueError('Input sequences are not appropriately aligned in sequence 2!')
+            raise ValueError(
+                'Input sequences are not appropriately aligned in sequence 2!')
         return seq1, seq2[:-difference_len]
 
 
@@ -459,6 +461,64 @@ class deBruijn:
                 rtn.append(read_debruijn_edge_kmer(edge_kmer, self.k))
         return ''.join(rtn)
 
+    def _bubble_aln(self,
+                    bubble_idx_seq1: List[int],
+                    bubble_idx_seq2: List[int],
+                    edge_read1: str = '',
+                    edge_read2: str = ''
+                    ) -> Tuple[str]:
+        """Align the bubbles in the de Bruijn graph
+
+        Args:
+            bubble_idx_seq1 (List[int]): the list containing indices of nodes of seq1 in the bubble
+            bubble_idx_seq2 (List[int]): the list containing indices of nodes of seq2 in the bubble
+            edge_read1 (str, optional): the edge kmer from the edge of the last merge node for seq1. Defaults to ''.
+            edge_read2 (str, optional): the edge kmer from the edge of the last merge node for seq2. Defaults to ''.
+
+        Returns:
+            Tuple[str]: the aligned sequences from the bubble in the de Bruijn graph
+        """
+        # extract original bubble sequences
+        bubble_seq1_str = f'{edge_read1}{self._extract_bubble(bubble_idx_seq1, 0)}'
+        bubble_seq2_str = f'{edge_read2}{self._extract_bubble(bubble_idx_seq2, 1)}'
+        # call the global_aln function to compute the global alignment of two sequences
+        return global_aln(bubble_seq1_str, bubble_seq2_str)
+
+    def _get_merge_edge(self,
+                        seq1_curr_idx: List[int],
+                        seq1_next_idx: List[int],
+                        seq2_curr_idx: List[int],
+                        seq2_next_idx: List[int]
+                        ) -> Tuple[str]:
+        """To get the duplicate_kmer from the edge that is from the merge node
+
+        Args:
+            seq1_curr_idx (List[int]): current node index of sequence1
+            seq1_next_idx (List[int]): next node index of sequence1
+            seq2_curr_idx (List[int]): current node index of sequence2
+            seq2_next_idx (List[int]): next node index of sequence2
+
+        Returns:
+            Tuple[str]: the duplicate_kmer string for each sequence that is from the merge node
+        """
+        seq1_edge_kmer = self.nodes[seq1_curr_idx].out_edges[seq1_next_idx].duplicate_str
+        seq2_edge_kmer = self.nodes[seq2_curr_idx].out_edges[seq2_next_idx].duplicate_str
+        if self.nodes[seq1_next_idx].node_type is NodeType.end:
+            merge_edge_read_seq1 = seq1_edge_kmer
+        else:
+            merge_edge_read_seq1 = read_debruijn_edge_kmer(
+                seq1_edge_kmer,
+                self.k
+            )
+        if self.nodes[seq2_next_idx].node_type is NodeType.end:
+            merge_edge_read_seq2 = seq2_edge_kmer
+        else:
+            merge_edge_read_seq2 = read_debruijn_edge_kmer(
+                seq2_edge_kmer,
+                self.k
+            )
+        return merge_edge_read_seq1, merge_edge_read_seq2
+
     def to_Alignment(self) -> Tuple[str]:
         """Use de Bruijn graph to align two sequences
 
@@ -485,41 +545,29 @@ class deBruijn:
                     self.seq_node_idx[0], self.seq_node_idx[1])
                 return self.to_Alignment()
 
+            # add the merge node index to the list
             bubble_idx_seq1.append(merge_idx)
             bubble_idx_seq2.append(merge_idx)
 
-            bubble_seq1_str = merge_edge_read_seq1 + \
-                self._extract_bubble(bubble_idx_seq1, 0)
-            bubble_seq2_str = merge_edge_read_seq2 + \
-                self._extract_bubble(bubble_idx_seq2, 1)
-            bubble_alignment = global_aln(bubble_seq1_str, bubble_seq2_str)
+            bubble_alignment = self._bubble_aln(
+                bubble_idx_seq1=bubble_idx_seq1,
+                bubble_idx_seq2=bubble_idx_seq2,
+                edge_read1=merge_edge_read_seq1,
+                edge_read2=merge_edge_read_seq2
+            )
 
             seq1_res.extend(
                 [bubble_alignment[0], self._read_from_kmer(merge_idx, 0)])
             seq2_res.extend(
                 [bubble_alignment[1], self._read_from_kmer(merge_idx, 1)])
 
-            # TODO: Refactor the code block, can extract a separate function
-            seq1_curr_idx = self.seq_node_idx[0][seq1_idx]
-            seq1_next_idx = self.seq_node_idx[0][seq1_idx + 1]
-            seq2_curr_idx = self.seq_node_idx[1][seq2_idx]
-            seq2_next_idx = self.seq_node_idx[1][seq2_idx + 1]
-            seq1_edge_kmer = self.nodes[seq1_curr_idx].out_edges[seq1_next_idx].duplicate_str
-            seq2_edge_kmer = self.nodes[seq2_curr_idx].out_edges[seq2_next_idx].duplicate_str
-            if self.nodes[seq1_next_idx].node_type is NodeType.end:
-                merge_edge_read_seq1 = seq1_edge_kmer
-            else:
-                merge_edge_read_seq1 = read_debruijn_edge_kmer(
-                    seq1_edge_kmer,
-                    self.k
-                )
-            if self.nodes[seq2_next_idx].node_type is NodeType.end:
-                merge_edge_read_seq2 = seq2_edge_kmer
-            else:
-                merge_edge_read_seq2 = read_debruijn_edge_kmer(
-                    seq2_edge_kmer,
-                    self.k
-                )
+            # extract the duplicate kmer on the merge node out edge
+            merge_edge_read_seq1, merge_edge_read_seq2 = self._get_merge_edge(
+                seq1_curr_idx=self.seq_node_idx[0][seq1_idx],
+                seq1_next_idx=self.seq_node_idx[0][seq1_idx + 1],
+                seq2_curr_idx=self.seq_node_idx[1][seq2_idx],
+                seq2_next_idx=self.seq_node_idx[1][seq2_idx + 1]
+            )
             seq1_idx += 1
             seq2_idx += 1
 
@@ -534,11 +582,12 @@ class deBruijn:
             bubble_idx_seq2.append(self.seq_node_idx[1][seq2_idx])
             seq2_idx += 1
 
-        bubble_seq1_str = merge_edge_read_seq1 + \
-            self._extract_bubble(bubble_idx_seq1, 0)
-        bubble_seq2_str = merge_edge_read_seq2 + \
-            self._extract_bubble(bubble_idx_seq2, 1)
-        bubble_alignment = global_aln(bubble_seq1_str, bubble_seq2_str)
+        bubble_alignment = self._bubble_aln(
+            bubble_idx_seq1=bubble_idx_seq1,
+            bubble_idx_seq2=bubble_idx_seq2,
+            edge_read1=merge_edge_read_seq1,
+            edge_read2=merge_edge_read_seq2
+        )
 
         seq1_res.append(bubble_alignment[0])
         seq2_res.append(bubble_alignment[1])
