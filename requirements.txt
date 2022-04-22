@@ -1,3 +1,4 @@
 cogent3==2022.4.20a1
-numpy~=1.21.0
-pytest~=7.0.1
+graphviz==0.20
+numpy==1.21.0
+pytest==7.0.1
