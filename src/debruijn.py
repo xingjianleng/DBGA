@@ -2,9 +2,9 @@ from enum import Enum, auto
 from typing import List, Set, Tuple
 from collections import Counter
 from pathlib import Path
-import subprocess
 import itertools
 
+import graphviz
 import numpy as np
 from cogent3.align import global_pairwise, make_dna_scoring_dict
 from cogent3 import load_unaligned_seqs, make_unaligned_seqs
@@ -236,6 +236,29 @@ class Node:
             self.out_edges[other_id] = new_edge
 
 
+def to_DOT(nodes: List[Node]) -> graphviz.Digraph:
+    """Obtain the DOT representation to the de Bruijn graph
+
+    Args:
+        nodes (List[Node]): list of nodes that belong to a de Bruijn graph
+
+    Returns:
+        graphviz.Digraph: graphviz Digraph object representing the de Bruijn graph
+    """
+    dot = graphviz.Digraph('de Bruijn')
+    for node in nodes:
+        dot.node(str(node.id), node.kmer)
+    for node in nodes:
+        for other_node, edge in node.out_edges.items():
+            dot.edge(
+                tail_name=str(node.id),
+                head_name=str(other_node),
+                label=edge.duplicate_str,
+                weight=str(edge.multiplicity)
+            )
+    return dot
+
+
 class deBruijn:
     """The de Bruijn graph class, with many useful method"""
 
@@ -278,8 +301,6 @@ class deBruijn:
 
         if node_type is NodeType.middle:
             self.exist_kmer[kmer] = self.id_count
-        elif node_type not in [NodeType.start, NodeType.end]:
-            raise ValueError('Invalid input type for sequence argument')
 
         self.id_count += 1
         return self.id_count - 1
@@ -359,50 +380,12 @@ class deBruijn:
                 duplicate_kmer=duplicate_kmer
             )
 
-    def _nodes_DOT_repr(self) -> str:
-        """Get the DOT representation of nodes in de Bruijn graph
-
-        Returns:
-            str: the DOT representation of nodes in original graph
-        """
-        rtn = [
-            f'\t{node.id} [label="{node.kmer}"];\n' for node in self.nodes.values()]
-        return "".join(rtn)
-
-    def _edges_DOT_repr(self) -> str:
-        """Get the DOT representation of edges in de Bruijn graph
-
-        Returns:
-            str: the DOT representation of edges in original graph
-        """
-        rtn = []
-        for index, node in enumerate(self.nodes.values()):
-            for other_node, edge in node.out_edges.items():
-                current_row = f'\t{node.id} -> {other_node} \
-                    [label="{edge.duplicate_str}", weight={edge.multiplicity}];'
-                if index != len(self.nodes) - 1:
-                    current_row += '\n'
-                rtn.append(current_row)
-        return ''.join(rtn)
-
-    def _to_DOT(self, path: Path) -> None:
-        """Write the DOT representation to the file
-
-        Args:
-            path (Path): the Path object points to the DOT file directory
-        """
-        with open(path, 'w', encoding='utf-8') as f:
-            f.write("digraph debuijn {\n")
-            f.write(self._nodes_DOT_repr())
-            f.write(self._edges_DOT_repr())
-            f.write('}')
-
-    def visualize(self, path: str, cleanup: bool = False) -> None:
+    def visualize(self, path: str, save_DOT: bool = False) -> None:
         """Visualize the de Bruijn graph
 
         Args:
-            path (str): the path points to the image file
-            cleanup (bool, optional): whether delete DOT intermediate file. Defaults to False.
+            path (str): the path to the output image file
+            save_DOT (bool, optional): whether save the DOT representation to file. Defaults to False.
 
         Raises:
             ValueError: when the image extension is not recognized
@@ -411,15 +394,12 @@ class deBruijn:
         suffix = file_path.suffix[1:]
         if suffix not in ['pdf', 'png', 'svg']:
             raise ValueError("Not supported file format")
-        dot_file = file_path.with_suffix(".DOT")
-        self._to_DOT(dot_file)
-        subprocess.run(
-            f'dot -T{suffix} {dot_file.__str__()} -o {file_path.__str__()}',
-            shell=True,
-            check=True
-        )
-        if cleanup:
-            dot_file.unlink()
+        digraph = to_DOT(list(self.nodes.values()))
+        # output the image
+        digraph.render(outfile=file_path, format=suffix, cleanup=True)
+        if save_DOT:
+            dot_file_path = file_path.with_suffix(".DOT")
+            digraph.save(dot_file_path)
 
     def _read_from_kmer(self, node_idx: int, seq_idx: int) -> str:
         """Read nucleotide(s) from the kmer with provided index
