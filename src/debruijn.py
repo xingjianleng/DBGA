@@ -267,7 +267,7 @@ def to_DOT(nodes: List[Node]) -> graphviz.Digraph:
 class deBruijn:
     """The de Bruijn graph class, with many useful method"""
 
-    def __init__(self, sequences, k: int) -> None:
+    def __init__(self, data, k: int) -> None:
         """Constructor for a de Bruijn graph
 
         Args:
@@ -281,7 +281,7 @@ class deBruijn:
         self.seq_node_idx = {}
         self.merge_node_idx = []
         self.seq_last_kmer_idx = []
-        self.sequences = load_sequences(data=sequences)
+        self.sequences = load_sequences(data=data)
         self.num_seq = len(self.sequences)
         self.add_debruijn()
 
