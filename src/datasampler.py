@@ -10,12 +10,12 @@ def is_similar_seqs_corona(name1: str, name2: str) -> bool:
     return name1[:2] == name2[:2]
 
 
-def sample_similar_seqs(path: Path, moltype: str = "dna") -> dict:
+def sample_similar_seqs(path: Path, moltype: str) -> dict:
     """Randomly sample two similar sequences from the fasta file
 
     Args:
         path (Path): the Path object of the fasta file
-        moltype (str, optional): molecule type. Defaults to 'dna'.
+        moltype (str, optional): molecule type
 
     Returns:
         dict: dictionary of the randomly sampled sequences with {sequence_name: sequence}
@@ -38,12 +38,12 @@ def sample_similar_seqs(path: Path, moltype: str = "dna") -> dict:
     }
 
 
-def sample_random_seqs(path: Path, moltype: str = "dna") -> dict:
+def sample_random_seqs(path: Path, moltype: str) -> dict:
     """Randomly sample two sequences from the fasta file
 
     Args:
         path (Path): the Path object of the fasta file
-        moltype (str, optional): molecule type. Defaults to 'dna'.
+        moltype (str, optional): the molecular type in the sequence
 
     Returns:
         dict: dictionary of the randomly sampled sequences with {sequence_name: sequence}
@@ -53,17 +53,17 @@ def sample_random_seqs(path: Path, moltype: str = "dna") -> dict:
     return {name: str(seqs.get_seq(name)) for name in chosen_seq_names}
 
 
-def dict_to_fasta(seqs: dict, moltype: str = "dna") -> str:
+def dict_to_fasta(seqs: dict) -> str:
     """Convert a dictionary of sequences into fasta format
 
     Args:
         seqs (dict): dictionary containing sequences with {name: sequence}
-        moltype (str, optional): molecule type. Defaults to 'dna'.
+        moltype (str, optional): the molecular type in the sequence
 
     Returns:
         str: the fasta representation of sequences
     """
-    seqs_collection = make_unaligned_seqs(seqs, moltype=moltype)
+    seqs_collection = make_unaligned_seqs(seqs)
     return seqs_collection.to_fasta()
 
 
@@ -73,4 +73,4 @@ if __name__ == "__main__":
     processed_path = Path("../data/processed")
     for i in range(files_count):
         with open(f"{processed_path}/similar-{i + 1}.fasta", "w") as f:
-            f.write(dict_to_fasta(sample_similar_seqs(path)))
+            f.write(dict_to_fasta(sample_similar_seqs(path, moltype="dna")))

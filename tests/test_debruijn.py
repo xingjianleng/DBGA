@@ -23,7 +23,8 @@ def example_checker(seqs, k, exp_seq1_idx, exp_seq2_idx, exp_merge, exp_aln):
     exp_seq1 = exp_aln[0][0].replace("-", "")
     exp_seq2 = exp_aln[0][1].replace("-", "")
 
-    db = deBruijn(seqs, k)
+    # all testing examples are DNA sequences
+    db = deBruijn(seqs, k, moltype="dna")
     # check kmer length
     kmer_length_checker(db)
     exp_start_idx = exp_seq1_idx[0], exp_seq2_idx[0]
@@ -110,32 +111,36 @@ def test_read_debruijn_edge_kmer():
 def test_load_sequences():
     # given a path, load sequences
     path = "./tests/data/gap_at_end.fasta"
-    sequence_loader_checker(load_sequences(path), "GTACAAGCGATG", "GTACAAGCGA")
+    sequence_loader_checker(
+        load_sequences(path, moltype="dna"), "GTACAAGCGATG", "GTACAAGCGA"
+    )
 
     # given a SequenceCollection, load sequences
     seq1 = "ACGTCAG"
     seq2 = "GACTGTGA"
     sc = SequenceCollection({"seq1": seq1, "seq2": seq2})
-    sequence_loader_checker(load_sequences(sc), seq1, seq2)
+    sequence_loader_checker(load_sequences(sc, moltype="dna"), seq1, seq2)
 
     # given a list of strings, load sequences
     seq_lst = ["ACGTCAG", "GACTGTGA"]
-    sequence_loader_checker(load_sequences(seq_lst), seq_lst[0], seq_lst[1])
+    sequence_loader_checker(
+        load_sequences(seq_lst, moltype="dna"), seq_lst[0], seq_lst[1]
+    )
 
     # if the provided parameter is in a wrong type, raise error
     with pytest.raises(ValueError) as e:
-        load_sequences({1: "ACGTGTA"})
+        load_sequences({1: "ACGTGTA"}, moltype="dna")
     exec_msg = e.value.args[0]
     assert exec_msg == "Invalid input for sequence argument"
 
     # if the provided path doesn't contain a file
     with pytest.raises(ValueError):
-        load_sequences("./tests/data/not_a_file")
+        load_sequences("./tests/data/not_a_file", moltype="dna")
 
     # if the sequences contain characters that is not in alphabet, raise an error
     sequences = ["ACTGA", "TACGE"]
     with pytest.raises(AlphabetError):
-        load_sequences(sequences)
+        load_sequences(sequences, moltype="dna")
 
 
 def test_lcs():
@@ -156,15 +161,15 @@ def test_global_aln():
     # one sequence is empty tests
     seq1 = ""
     seq2 = "ACG"
-    assert global_aln(seq1=seq1, seq2=seq2) == ("---", "ACG")
+    assert dna_global_aln(seq1=seq1, seq2=seq2) == ("---", "ACG")
     seq1 = "CTA"
     seq2 = ""
-    assert global_aln(seq1=seq1, seq2=seq2) == ("CTA", "---")
+    assert dna_global_aln(seq1=seq1, seq2=seq2) == ("CTA", "---")
 
     # simple alignment test
     seq1 = "GGATCGA"
     seq2 = "GAATTCAGTTA"
-    assert global_aln(seq1=seq1, seq2=seq2) in [
+    assert dna_global_aln(seq1=seq1, seq2=seq2) in [
         ("GGA-TC-G--A", "GAATTCAGTTA"),
         ("GGAT-C-G--A", "GAATTCAGTTA"),
     ]
@@ -203,6 +208,37 @@ def test_get_kmers():
         get_kmers(test_seq2, 16)
     exec_msg = e.value.args[0]
     assert exec_msg == "Invalid k size for kmers"
+
+
+def test_mapping_shift():
+    # Test case 1
+    seq1 = "TGTAAGCGA"
+    seq2 = "GTACAAGCGA"
+    db = deBruijn([seq1, seq2], k=3, moltype="dna")
+    shift_res = mapping_shifts(db)
+    assert shift_res == {"node_indicies": [2, 4, 5, 6, 7], "shifts": [-1, 1, 1, 1, 1]}
+
+    # Test case 2
+    seq1 = "TACCACGTAAT"
+    seq2 = "TACGACCTAAT"
+    db = deBruijn([seq1, seq2], k=3, moltype="dna")
+    shift_res = mapping_shifts(db)
+    assert shift_res == {"node_indicies": [1, 2, 5, 8, 9], "shifts": [0, 3, -3, 0, 0]}
+
+    # Test case 3
+    seq1 = "TACCGTCCAGACGTAAT"
+    seq2 = "TACGGTCCAGACCTAAT"
+    db = deBruijn([seq1, seq2], k=3, moltype="dna")
+    shift_res = mapping_shifts(db)
+    assert shift_res == {
+        "node_indicies": [1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13],
+        "shifts": [0, 9, 1, 1, 1, 1, 1, 1, -8, 2, 2],
+    }
+
+    # Test case 4
+    db = seq1
+    with pytest.raises(AssertionError):
+        shift_res = mapping_shifts(db)
 
 
 def test_duplicate_kmers():

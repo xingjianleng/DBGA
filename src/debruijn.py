@@ -1,11 +1,11 @@
 from enum import Enum, auto
-from typing import List, Set, Tuple
 from collections import Counter
 from pathlib import Path
 import itertools
 
 import graphviz
 import numpy as np
+import plotly.express as px
 from cogent3.align import global_pairwise, make_dna_scoring_dict
 from cogent3 import load_unaligned_seqs, make_unaligned_seqs
 from cogent3 import SequenceCollection
@@ -15,7 +15,7 @@ from cogent3 import SequenceCollection
 s = make_dna_scoring_dict(10, -1, -8)
 
 
-def balancing_aln_seqs(seq1: str, seq2: str) -> Tuple[str]:
+def balancing_aln_seqs(seq1: str, seq2: str) -> tuple:
     """Helper function to compensate the edge case where one sequence has further end than the other
 
     Args:
@@ -27,7 +27,7 @@ def balancing_aln_seqs(seq1: str, seq2: str) -> Tuple[str]:
         ValueError: get invalid aligned sequence 2
 
     Returns:
-        Tuple[str]: two aligned sequences without extra gaps at the end
+        tuple: two aligned sequences without extra gaps at the end
     """
     if len(seq1) == len(seq2):
         return seq1, seq2
@@ -99,12 +99,12 @@ def lcs(list1: list, list2: list) -> list:
     return common_seq
 
 
-def load_sequences(data) -> np.ndarray:
+def load_sequences(data, moltype: str) -> np.ndarray:
     """Load the sequences and transform it into numpy array of strings (in Unicode)
 
     Args:
         sequences : sequences to load, could be `path`, `SequenceCollection`, `list`
-        moltype (str, optional): _description_. Defaults to 'dna'.
+        moltype (str): the molecular type in the sequence
 
     Raises:
         ValueError: if the sequences parameter is not `path`, `SequenceCollection`, `list`
@@ -112,7 +112,7 @@ def load_sequences(data) -> np.ndarray:
     Returns:
         np.ndarray: the numpy array containing the loaded sequences
     """
-    moltype = "dna"
+
     if isinstance(data, str):
         path = Path(data).expanduser().absolute()
         data = load_unaligned_seqs(path, moltype=moltype)
@@ -125,7 +125,7 @@ def load_sequences(data) -> np.ndarray:
         raise ValueError("Invalid input for sequence argument")
 
 
-def get_kmers(sequence: str, k: int) -> List[str]:
+def get_kmers(sequence: str, k: int) -> list:
     """Get the kmers in sequences
 
     Args:
@@ -136,21 +136,21 @@ def get_kmers(sequence: str, k: int) -> List[str]:
         ValueError: the k value should be in [1, len(sequence)]
 
     Returns:
-        List[str]: the list of kmers of the sequence
+        list: the list of kmers of the sequence
     """
     if k < 0 or k > len(sequence):
         raise ValueError("Invalid k size for kmers")
     return [sequence[i : i + k] for i in range(len(sequence) - k + 1)]
 
 
-def duplicate_kmers(kmer_seqs: List[List[str]]) -> Set[str]:
+def duplicate_kmers(kmer_seqs: list) -> set:
     """Get the duplicate kmers from each sequence
 
     Args:
-        kmer_seqs (List[List[str]]): list of kmers for each sequence
+        kmer_seqs (list): list of kmers for each sequence
 
     Returns:
-        Set[str]: the set containing duplicate kmers
+        set: the set containing duplicate kmers
     """
     assert len(kmer_seqs) == 2
     duplicate_set = set()
@@ -162,15 +162,16 @@ def duplicate_kmers(kmer_seqs: List[List[str]]) -> Set[str]:
     return duplicate_set
 
 
-def global_aln(seq1: str, seq2: str) -> Tuple[str]:
+def dna_global_aln(seq1: str, seq2: str) -> tuple:
     """Align the sequences in bubbles with node indices provided
 
     Args:
         seq1 (str): the first sequence to align
         seq2 (str): the second sequence to align
+        moltype (str): the molecular type in the sequence
 
     Returns:
-        Tuple[str]: the tuple of aligned sequences
+        tuple: the tuple of aligned sequences
     """
     if seq1 and seq2:
         seq_colllection = make_unaligned_seqs({0: seq1, 1: seq2}, moltype="dna")
@@ -182,6 +183,63 @@ def global_aln(seq1: str, seq2: str) -> Tuple[str]:
         return "-" * len(seq2), seq2
     else:
         return "", ""
+
+
+def to_DOT(nodes: list) -> graphviz.Digraph:  # pragma: no cover
+    """Obtain the DOT representation to the de Bruijn graph
+
+    Args:
+        nodes (list): list of nodes that belong to a de Bruijn graph
+
+    Returns:
+        graphviz.Digraph: graphviz Digraph object representing the de Bruijn graph
+    """
+    dot = graphviz.Digraph("de Bruijn")
+    for node in nodes:
+        dot.node(str(node.id), node.kmer)
+    for node in nodes:
+        for other_node, edge in node.out_edges.items():
+            dot.edge(
+                tail_name=str(node.id),
+                head_name=str(other_node),
+                label=edge.duplicate_str,
+                weight=str(edge.multiplicity),
+            )
+    return dot
+
+
+def mapping_shifts(db, visualize: bool = False) -> dict:
+    """The function to plot the shifting of indicies of matched kmers
+
+    Args:
+        db (Any): a deBruijn graph object of two sequences
+        visualize (bool): whether show the visualization of the shifts plot
+
+    Returns:
+        dict: the dictionary containing merge_node_indicies and the shift values
+    """
+    # db should be in type deBruijn
+    assert isinstance(db, deBruijn)
+
+    sorted_merge_lst = sorted(db.merge_node_idx)
+
+    shifts = [
+        db.seq_node_idx[1].index(merge_idx) - db.seq_node_idx[0].index(merge_idx)
+        for merge_idx in sorted_merge_lst
+    ]
+    merge_shifts = {"node_indicies": sorted_merge_lst, "shifts": shifts}
+
+    if visualize:  # pragma: no cover
+        figure = px.line(
+            merge_shifts,
+            x="node_indicies",
+            y="shifts",
+            title="Matching shifts over merge node indicies based on sequence 1",
+            markers=True,
+        )
+        figure.show()
+
+    return merge_shifts
 
 
 # Enum type of different NodeTypes
@@ -241,33 +299,10 @@ class Node:
             self.out_edges[other_id] = new_edge
 
 
-def to_DOT(nodes: List[Node]) -> graphviz.Digraph:
-    """Obtain the DOT representation to the de Bruijn graph
-
-    Args:
-        nodes (List[Node]): list of nodes that belong to a de Bruijn graph
-
-    Returns:
-        graphviz.Digraph: graphviz Digraph object representing the de Bruijn graph
-    """
-    dot = graphviz.Digraph("de Bruijn")
-    for node in nodes:
-        dot.node(str(node.id), node.kmer)
-    for node in nodes:
-        for other_node, edge in node.out_edges.items():
-            dot.edge(
-                tail_name=str(node.id),
-                head_name=str(other_node),
-                label=edge.duplicate_str,
-                weight=str(edge.multiplicity),
-            )
-    return dot
-
-
 class deBruijn:
     """The de Bruijn graph class, with many useful method"""
 
-    def __init__(self, data, k: int) -> None:
+    def __init__(self, data, k: int, moltype: str) -> None:
         """Constructor for a de Bruijn graph
 
         Args:
@@ -281,7 +316,7 @@ class deBruijn:
         self.seq_node_idx = {}
         self.merge_node_idx = []
         self.seq_last_kmer_idx = []
-        self.sequences = load_sequences(data=data)
+        self.sequences = load_sequences(data=data, moltype=moltype)
         self.num_seq = len(self.sequences)
         self.add_debruijn()
 
@@ -320,17 +355,15 @@ class deBruijn:
         """
         self.nodes[out_id].add_out_edge(in_id, duplicate_str=duplicate_str)
 
-    def _get_seq_kmer_idx(
-        self, kmers: List[str], duplicate_kmer: Set[str]
-    ) -> List[int]:
+    def _get_seq_kmer_idx(self, kmers: list, duplicate_kmer: set) -> list:
         """Add kmers (of a sequence) to the de Bruijn graph, also get their indices
 
         Args:
-            kmers (List[str]): kmers of a sequence
-            duplicate_kmer (Set[str]): kmers where they are recorded to be duplicate (not included in nodes)
+            kmers (list): kmers of a sequence
+            duplicate_kmer (set): kmers where they are recorded to be duplicate (not included in nodes)
 
         Returns:
-            List[int]: the indices of nodes where kmers are added
+            list: the indices of nodes where kmers are added
         """
         # to record the duplicated kmers
         edge_kmer = []
@@ -385,7 +418,7 @@ class deBruijn:
                 kmers=kmer_seq, duplicate_kmer=duplicate_kmer
             )
 
-    def visualize(self, path: str, save_DOT: bool = False) -> None:
+    def visualize(self, path: str, save_DOT: bool = False) -> None:  # pragma: no cover
         """Visualize the de Bruijn graph
 
         Args:
@@ -420,11 +453,11 @@ class deBruijn:
         kmer = self.nodes[node_idx].kmer
         return kmer if node_idx == self.seq_last_kmer_idx[seq_idx] else kmer[0]
 
-    def _extract_bubble(self, bubble_idx_seq: List[int], seq_idx: int) -> str:
+    def _extract_bubble(self, bubble_idx_seq: list, seq_idx: int) -> str:
         """Extract the string from the bubble from indices of nodes
 
         Args:
-            bubble_idx_seq (List[int]): indices of nodes that are in the bubble
+            bubble_idx_seq (list): indices of nodes that are in the bubble
             seq_idx (int): the sequence index the bubble belongs to
 
         Returns:
@@ -448,45 +481,45 @@ class deBruijn:
 
     def _bubble_aln(
         self,
-        bubble_idx_seq1: List[int],
-        bubble_idx_seq2: List[int],
+        bubble_idx_seq1: list,
+        bubble_idx_seq2: list,
         edge_read1: str = "",
         edge_read2: str = "",
-    ) -> Tuple[str]:
+    ) -> tuple:
         """Align the bubbles in the de Bruijn graph
 
         Args:
-            bubble_idx_seq1 (List[int]): the list containing indices of nodes of seq1 in the bubble
-            bubble_idx_seq2 (List[int]): the list containing indices of nodes of seq2 in the bubble
+            bubble_idx_seq1 (list): the list containing indices of nodes of seq1 in the bubble
+            bubble_idx_seq2 (list): the list containing indices of nodes of seq2 in the bubble
             edge_read1 (str, optional): the edge kmer from the edge of the last merge node for seq1. Defaults to ''.
             edge_read2 (str, optional): the edge kmer from the edge of the last merge node for seq2. Defaults to ''.
 
         Returns:
-            Tuple[str]: the aligned sequences from the bubble in the de Bruijn graph
+            tuple: the aligned sequences from the bubble in the de Bruijn graph
         """
         # extract original bubble sequences
         bubble_seq1_str = f"{edge_read1}{self._extract_bubble(bubble_idx_seq1, 0)}"
         bubble_seq2_str = f"{edge_read2}{self._extract_bubble(bubble_idx_seq2, 1)}"
         # call the global_aln function to compute the global alignment of two sequences
-        return global_aln(bubble_seq1_str, bubble_seq2_str)
+        return dna_global_aln(bubble_seq1_str, bubble_seq2_str)
 
     def _get_merge_edge(
         self,
-        seq1_curr_idx: List[int],
-        seq1_next_idx: List[int],
-        seq2_curr_idx: List[int],
-        seq2_next_idx: List[int],
-    ) -> Tuple[str]:
+        seq1_curr_idx: list,
+        seq1_next_idx: list,
+        seq2_curr_idx: list,
+        seq2_next_idx: list,
+    ) -> tuple:
         """To get the duplicate_kmer from the edge that is from the merge node
 
         Args:
-            seq1_curr_idx (List[int]): current node index of sequence1
-            seq1_next_idx (List[int]): next node index of sequence1
-            seq2_curr_idx (List[int]): current node index of sequence2
-            seq2_next_idx (List[int]): next node index of sequence2
+            seq1_curr_idx (list): current node index of sequence1
+            seq1_next_idx (list): next node index of sequence1
+            seq2_curr_idx (list): current node index of sequence2
+            seq2_next_idx (list): next node index of sequence2
 
         Returns:
-            Tuple[str]: the duplicate_kmer string for each sequence that is from the merge node
+            tuple: the duplicate_kmer string for each sequence that is from the merge node
         """
         seq1_edge_kmer = (
             self.nodes[seq1_curr_idx].out_edges[seq1_next_idx].duplicate_str
@@ -504,11 +537,11 @@ class deBruijn:
             merge_edge_read_seq2 = read_debruijn_edge_kmer(seq2_edge_kmer, self.k)
         return merge_edge_read_seq1, merge_edge_read_seq2
 
-    def to_alignment(self) -> Tuple[str]:
+    def to_alignment(self) -> tuple:
         """Use de Bruijn graph to align two sequences
 
         Returns:
-            Tuple[str]: the tuple of aligned sequences
+            tuple: the tuple of aligned sequences
         """
         seq1_idx, seq2_idx = 0, 0
         seq1_res, seq2_res = [], []
