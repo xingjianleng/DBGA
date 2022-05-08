@@ -54,40 +54,6 @@ def example_checker(seqs, k, exp_seq1_idx, exp_seq2_idx, exp_merge, exp_aln):
     assert db.merge_node_idx == exp_merge
 
 
-def test_balancing_aln_seqs():
-    # equal length test
-    seq1 = "AGCTCTAGT"
-    seq2 = "TAGACTGTA"
-    balancing_res = balancing_aln_seqs(seq1, seq2)
-    assert balancing_res == (seq1, seq2)
-
-    # first sequence balancing test
-    seq3 = "AGCTCTA----"
-    balancing_res = balancing_aln_seqs(seq3, seq2)
-    assert balancing_res == ("AGCTCTA--", seq2)
-
-    # second sequence balancing test
-    seq4 = "TACTGTA----"
-    balancing_res = balancing_aln_seqs(seq1, seq4)
-    assert balancing_res == (seq1, "TACTGTA--")
-
-    # Error test, incorrect alignment in sequence 1
-    seq5 = "AGCTCTAGTAG"
-    seq6 = "TAGACTGTA-"
-    with pytest.raises(ValueError) as e:
-        balancing_res = balancing_aln_seqs(seq5, seq6)
-    exec_msg = e.value.args[0]
-    assert exec_msg == "Input sequences are not appropriately aligned in sequence 1!"
-
-    # Error test, incorrect alignment in sequence 2
-    seq7 = "AGCTCTAGT--"
-    seq8 = "TAGACTGTATCG"
-    with pytest.raises(ValueError) as e:
-        balancing_res = balancing_aln_seqs(seq7, seq8)
-    exec_msg = e.value.args[0]
-    assert exec_msg == "Input sequences are not appropriately aligned in sequence 2!"
-
-
 def test_read_debruijn_edge_kmer():
     # empty string test case
     seq1 = ""
@@ -361,6 +327,35 @@ def test_duplicate_kmer_in_bubble():
         exp_seq1_idx=list(range(9)),
         exp_seq2_idx=[9, 1, 10, 11, 7, 12],
         exp_merge=[1, 7],
+        exp_aln=[(seq1, seq2)],
+    )
+
+
+def test_both_end_duplicate():
+    # NOTE: Two sequences end with duplicate kmers, and these duplicate kmers are connected
+    #       to a merge node.
+    seq1 = "ACGTGACG"
+    seq2 = "ACTTGACG"
+    example_checker(
+        seqs="./tests/data/both_end_duplicate.fasta",
+        k=3,
+        exp_seq1_idx=list(range(6)),
+        exp_seq2_idx=[6, 7, 8, 9, 3, 4, 10],
+        exp_merge=[3, 4],
+        exp_aln=[(seq1, seq2)],
+    )
+
+
+def test_unrelated_sequences():
+    # NOTE: Two sequences do not share any common kmer
+    seq1 = "ACGT--AGTATC"
+    seq2 = "ACCTACAGCA--"
+    example_checker(
+        seqs="./tests/data/unrelated_sequences.fasta",
+        k=3,
+        exp_seq1_idx=list(range(8)),
+        exp_seq2_idx=list(range(8, 18)),
+        exp_merge=[],
         exp_aln=[(seq1, seq2)],
     )
 
