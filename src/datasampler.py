@@ -2,6 +2,7 @@ from pathlib import Path
 from random import choice, sample
 
 
+from cogent3.parse.genbank import RichGenbankParser
 from cogent3 import load_unaligned_seqs, make_unaligned_seqs
 
 
@@ -67,10 +68,21 @@ def dict_to_fasta(seqs: dict) -> str:
     return seqs_collection.to_fasta()
 
 
+def gbparser():
+    path = "../data/raw/mers.gb"
+    with open(path, "r") as infile:
+        n, seq = list(RichGenbankParser(infile, moltype="dna"))[0]
+    seq_collection = make_unaligned_seqs({n: seq}, moltype="dna")
+    path_fasta = "../data/processed/mers.fasta"
+    with open(path_fasta, "w") as f:
+        f.write(seq_collection.to_fasta())
+
+
 if __name__ == "__main__":
-    files_count = 5
-    path = Path("../data/raw/corona-unaligned.fasta")
-    processed_path = Path("../data/processed")
-    for i in range(files_count):
-        with open(f"{processed_path}/similar-{i + 1}.fasta", "w") as f:
-            f.write(dict_to_fasta(sample_similar_seqs(path, moltype="dna")))
+    # files_count = 5
+    # path = Path("../data/raw/corona-unaligned.fasta")
+    # processed_path = Path("../data/processed")
+    # for i in range(files_count):
+    #     with open(f"{processed_path}/similar-{i + 1}.fasta", "w") as f:
+    #         f.write(dict_to_fasta(sample_similar_seqs(path, moltype="dna")))
+    gbparser()
