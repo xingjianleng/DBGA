@@ -3,7 +3,6 @@ from enum import Enum, auto
 from collections import Counter
 from typing import List, Tuple, Set
 from pathlib import Path
-import itertools
 
 import graphviz
 import numpy as np
@@ -30,43 +29,6 @@ def read_debruijn_edge_kmer(seq: str, k: int) -> str:
     assert len(seq) % k == 0
     rtn = [seq[i] for i in range(0, len(seq), k)]
     return "".join(rtn)
-
-
-# TODO: Improve memory usage using Hirschberg algorithm
-def lcs(list1: list, list2: list) -> list:
-    """Find the longest common subsequence of two lists
-
-    Args:
-        list1 (list): the first input list
-        list2 (list): the second input list
-    Returns:
-        list: the list containing longest common subsequence
-    """
-    score = np.zeros((len(list1) + 1, len(list2) + 1), dtype=np.int_)
-    for i, j in itertools.product(range(1, len(list1) + 1), range(1, len(list2) + 1)):
-        score[i, j] = (
-            score[i - 1, j - 1] + 1
-            if list1[i - 1] == list2[j - 1]
-            else max(score[i - 1, j], score[i, j - 1])
-        )
-
-    longest_length = score[len(list1), len(list2)]
-    common_seq = [-1] * longest_length
-
-    idx1 = len(list1)
-    idx2 = len(list2)
-
-    while idx1 > 0 and idx2 > 0:
-        if list1[idx1 - 1] == list2[idx2 - 1]:
-            common_seq[longest_length - 1] = list1[idx1 - 1]
-            idx1 -= 1
-            idx2 -= 1
-            longest_length -= 1
-        elif score[idx1 - 1][idx2] > score[idx1][idx2 - 1]:
-            idx1 -= 1
-        else:
-            idx2 -= 1
-    return common_seq
 
 
 def load_sequences(data, moltype: str) -> np.ndarray:
@@ -178,12 +140,49 @@ def to_DOT(nodes: List[Node]) -> graphviz.Digraph:  # pragma: no cover
     return dot
 
 
-def mapping_shifts(db, visualize: bool = False) -> dict:
+def filter_outliers(indicies: np.ndarray, arr: np.ndarray) -> Tuple[np.np.ndarray]:
+    """Filter outliers in a given array
+
+    Args:
+        indicies (np.ndarray): the indicies of each array element
+        arr (np.ndarray): the array elements
+
+    Returns:
+        Tuple[np.np.ndarray]: the tuple of (indicies, arr) after filtering
+    """
+    # use Chebyshev to filter remaining outliers
+    while True:
+        mean = np.mean(arr)
+        std = np.std(arr, ddof=1)
+        cheb = 3 * std
+
+        outliers = np.logical_or(arr < (mean - cheb), arr > (mean + cheb))
+
+        # when too many data points are considered as outliers / no data is outlier, stop filtering
+        if sum(outliers) > 0.01 * len(indicies) or sum(outliers) == 0:
+            break
+
+        arr = arr[~outliers]
+        indicies = indicies[~outliers]
+
+    # filter outliers with histogram count < 5, it works well only with large input data
+    counts, intervals = np.histogram(arr)
+
+    for i, count in enumerate(counts):
+        if count < 5:
+            outliers = np.logical_and(arr >= intervals[i], arr <= intervals[i + 1])
+            arr = arr[~outliers]
+            indicies = indicies[~outliers]
+    return indicies, arr
+
+
+def mapping_shifts(db, elim_outliers: bool = False, visualize: bool = False) -> dict:
     """The function to plot the shifting of indicies of matched kmers
 
     Args:
         db (Any): a deBruijn graph object of two sequences
-        visualize (bool): whether show the visualization of the shifts plot
+        elim_outliers (bool): whether eliminate outliers in shifts. Defaults to False
+        visualize (bool): whether show the visualization of the shifts plot. Defaults to False
 
     Returns:
         dict: the dictionary containing merge_node_indicies and the shift values
@@ -193,11 +192,23 @@ def mapping_shifts(db, visualize: bool = False) -> dict:
 
     sorted_merge_lst = sorted(db.merge_node_idx)
 
-    shifts = [
-        db.seq_node_idx[1].index(merge_idx) - db.seq_node_idx[0].index(merge_idx)
-        for merge_idx in sorted_merge_lst
-    ]
-    merge_shifts = {"node_indicies": sorted_merge_lst, "shifts": shifts}
+    # convert data to numpy array for easier calculation
+    shifts = np.array(
+        [
+            db.seq_node_idx[1].index(merge_idx) - db.seq_node_idx[0].index(merge_idx)
+            for merge_idx in sorted_merge_lst
+        ]
+    )
+    sorted_merge_lst = np.array(sorted_merge_lst)
+
+    # filter outliers in shifts
+    if elim_outliers:  # pragma: no cover
+        sorted_merge_lst, shifts = filter_outliers(sorted_merge_lst, shifts)
+
+    merge_shifts = {
+        "node_indicies": sorted_merge_lst.tolist(),
+        "shifts": shifts.tolist(),
+    }
 
     if visualize:  # pragma: no cover
         figure = px.line(
@@ -542,7 +553,11 @@ class deBruijn:
             if seq1_idx == len(self.seq_node_idx[0]) or seq2_idx == len(
                 self.seq_node_idx[1]
             ):
-                self.merge_node_idx = lcs(self.seq_node_idx[0], self.seq_node_idx[1])
+                print("Fix starts")
+                self.merge_node_idx = mapping_shifts(self, elim_outliers=True)[
+                    "node_indicies"
+                ]
+                print("Fix ends")
                 return self.to_alignment()
 
             # add the merge node index to the list

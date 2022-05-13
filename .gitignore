@@ -1,3 +1,4 @@
 /data/
+/benchmark/
 .coverage
 **/__pycache__

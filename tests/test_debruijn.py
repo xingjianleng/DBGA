@@ -109,20 +109,6 @@ def test_load_sequences():
         load_sequences(sequences, moltype="dna")
 
 
-def test_lcs():
-    # find lcs of list of char test
-    lst1 = ["B", "C", "D", "A", "A", "C", "D"]
-    lst2 = ["A", "C", "D", "B", "A", "C"]
-    lcs_result = lcs(lst1, lst2)
-    assert lcs_result == ["C", "D", "A", "C"]
-
-    # find lcs of list of int test
-    lst1 = [3, 6, 1, 8, 10]
-    lst2 = [1, 8, 6]
-    lcs_result = lcs(lst1, lst2)
-    assert lcs_result == [1, 8]
-
-
 def test_global_aln():
     # one sequence is empty tests
     seq1 = ""
@@ -356,37 +342,6 @@ def test_unrelated_sequences():
         exp_seq1_idx=list(range(8)),
         exp_seq2_idx=list(range(8, 18)),
         exp_merge=[],
-        exp_aln=[(seq1, seq2)],
-    )
-
-
-@pytest.mark.xfail(reason="Algorithm can't tackle with this edge case!")
-def test_kmer_mutation_lcs_fail():
-    # NOTE: Duplicate kmer at different position of different sequences lead to cycles
-    #       No merged kmers between cycles (This case LCS doesn't help)
-    seq1 = "TACCACGTAAT"
-    seq2 = "TACGACCTAAT"
-    example_checker(
-        seqs="./tests/data/kmer_mutation_lcs_fail.fasta",
-        k=3,
-        exp_seq1_idx=list(range(11)),
-        exp_seq2_idx=[11, 1, 5, 12, 13, 2, 14, 15, 8, 9, 16],
-        exp_merge=[1, 8, 9],
-        exp_aln=[(seq1, seq2)],
-    )
-
-
-def test_kmer_mutation_lcs_success():
-    # NOTE: Duplicate kmer at different position of different sequences lead to cycles
-    #       With merged kmers between cycles (This case we can use LCS to solve the problem)
-    seq1 = "TACCGTCCAGACGTAAT"
-    seq2 = "TACGGTCCAGACCTAAT"
-    example_checker(
-        seqs="./tests/data/kmer_mutation_lcs_success.fasta",
-        k=3,
-        exp_seq1_idx=list(range(15)),
-        exp_seq2_idx=[15, 1, 10, 16, 17, 4, 5, 6, 7, 8, 9, 2, 18, 19, 12, 13, 20],
-        exp_merge=[1, 4, 5, 6, 7, 8, 9, 12, 13],
         exp_aln=[(seq1, seq2)],
     )
 
