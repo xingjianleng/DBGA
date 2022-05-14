@@ -1,7 +1,7 @@
 from __future__ import annotations
 from enum import Enum, auto
 from collections import Counter
-from typing import List, Tuple, Set
+from typing import Dict, List, Tuple, Set
 from pathlib import Path
 
 import graphviz
@@ -94,7 +94,7 @@ def duplicate_kmers(kmer_seqs: List[List[str]]) -> Set[str]:
     return duplicate_set
 
 
-def dna_global_aln(seq1: str, seq2: str) -> Tuple[str]:
+def dna_global_aln(seq1: str, seq2: str) -> Tuple[str, str]:
     """Align the sequences in bubbles with node indices provided
 
     Args:
@@ -103,7 +103,7 @@ def dna_global_aln(seq1: str, seq2: str) -> Tuple[str]:
         moltype (str): the molecular type in the sequence
 
     Returns:
-        Tuple[str]: the tuple of aligned sequences
+        Tuple[str, str]: the tuple of aligned sequences
     """
     if seq1 and seq2:
         seq_colllection = make_unaligned_seqs({0: seq1, 1: seq2}, moltype="dna")
@@ -140,7 +140,9 @@ def to_DOT(nodes: List[Node]) -> graphviz.Digraph:  # pragma: no cover
     return dot
 
 
-def filter_outliers(indicies: np.ndarray, arr: np.ndarray) -> Tuple[np.np.ndarray]:
+def filter_outliers(
+    indicies: np.ndarray, arr: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray]:
     """Filter outliers in a given array
 
     Args:
@@ -148,7 +150,7 @@ def filter_outliers(indicies: np.ndarray, arr: np.ndarray) -> Tuple[np.np.ndarra
         arr (np.ndarray): the array elements
 
     Returns:
-        Tuple[np.np.ndarray]: the tuple of (indicies, arr) after filtering
+        Tuple[np.ndarray, np.ndarray]: the tuple of (indicies, arr) after filtering
     """
     # use Chebyshev to filter remaining outliers
     while True:
@@ -176,7 +178,9 @@ def filter_outliers(indicies: np.ndarray, arr: np.ndarray) -> Tuple[np.np.ndarra
     return indicies, arr
 
 
-def mapping_shifts(db, elim_outliers: bool = False, visualize: bool = False) -> dict:
+def mapping_shifts(
+    db, elim_outliers: bool = False, visualize: bool = False
+) -> Dict[str, List[int]]:
     """The function to plot the shifting of indicies of matched kmers
 
     Args:
@@ -185,28 +189,28 @@ def mapping_shifts(db, elim_outliers: bool = False, visualize: bool = False) -> 
         visualize (bool): whether show the visualization of the shifts plot. Defaults to False
 
     Returns:
-        dict: the dictionary containing merge_node_indicies and the shift values
+        Dict[List[int], List[int]]: the dictionary containing merge_node_indicies and the shift values
     """
     # db should be in type deBruijn
     assert isinstance(db, deBruijn)
 
-    sorted_merge_lst = sorted(db.merge_node_idx)
+    sorted_merge_lst: List[int] = sorted(db.merge_node_idx)
 
     # convert data to numpy array for easier calculation
-    shifts = np.array(
+    shifts: np.ndarray = np.array(
         [
             db.seq_node_idx[1].index(merge_idx) - db.seq_node_idx[0].index(merge_idx)
             for merge_idx in sorted_merge_lst
         ]
     )
-    sorted_merge_lst = np.array(sorted_merge_lst)
+    sorted_merge_arr: np.ndarray = np.array(sorted_merge_lst)
 
     # filter outliers in shifts
     if elim_outliers:  # pragma: no cover
-        sorted_merge_lst, shifts = filter_outliers(sorted_merge_lst, shifts)
+        sorted_merge_arr, shifts = filter_outliers(sorted_merge_arr, shifts)
 
     merge_shifts = {
-        "node_indicies": sorted_merge_lst.tolist(),
+        "node_indicies": sorted_merge_arr.tolist(),
         "shifts": shifts.tolist(),
     }
 
@@ -263,7 +267,7 @@ class Node:
         self.kmer = kmer
         self.node_type = node_type
         # the edge between two nodes won't be duplicate in the same direction
-        self.out_edges = {}
+        self.out_edges: Dict[int, Edge] = {}
         self.count = 1
 
     def add_out_edge(self, other_id: int, duplicate_str: str = "") -> None:
@@ -292,11 +296,11 @@ class deBruijn:
         """
         self.id_count = 0
         self.k = k
-        self.nodes = {}
-        self.exist_kmer = {}
-        self.seq_node_idx = {}
-        self.merge_node_idx = []
-        self.seq_last_kmer_idx = []
+        self.nodes: Dict[int, Node] = {}
+        self.exist_kmer: Dict[str, int] = {}
+        self.seq_node_idx: Dict[int, List[int]] = {}
+        self.merge_node_idx: List[int] = []
+        self.seq_last_kmer_idx: List[int] = []
         self.sequences = load_sequences(data=data, moltype=moltype)
         self.num_seq = len(self.sequences)
         self.add_debruijn()
@@ -468,7 +472,7 @@ class deBruijn:
         bubble_indicies_seq2: List[int],
         prev_edge_read1: str = "",
         prev_edge_read2: str = "",
-    ) -> Tuple[str]:
+    ) -> Tuple[str, str]:
         """Align the bubbles in the de Bruijn graph
 
         Args:
@@ -478,7 +482,7 @@ class deBruijn:
             edge_read2 (str, optional): the edge kmer from the edge of the last merge node for seq2. Defaults to "".
 
         Returns:
-            Tuple[str]: the aligned sequences from the bubble in the de Bruijn graph
+            Tuple[str, str]: the aligned sequences from the bubble in the de Bruijn graph
         """
         # extract original bubble sequences
         bubble_seq1_str = (
@@ -496,7 +500,7 @@ class deBruijn:
         seq1_next_idx: int,
         seq2_curr_idx: int,
         seq2_next_idx: int,
-    ) -> Tuple[str]:
+    ) -> Tuple[str, str]:
         """To get the duplicate_kmer from the edge that is from the merge node
 
         Args:
@@ -506,7 +510,7 @@ class deBruijn:
             seq2_next_idx (int): next node index of sequence2
 
         Returns:
-            Tuple[str]: the duplicate_kmer string for each sequence that is from the merge node
+            Tuple[str, str]: the duplicate_kmer string for each sequence that is from the merge node
         """
         seq1_edge_kmer = (
             self.nodes[seq1_curr_idx].out_edges[seq1_next_idx].duplicate_str
@@ -519,11 +523,11 @@ class deBruijn:
         merge_edge_read_seq2 = read_debruijn_edge_kmer(seq2_edge_kmer, self.k)
         return merge_edge_read_seq1, merge_edge_read_seq2
 
-    def to_alignment(self) -> Tuple[str]:
+    def to_alignment(self) -> Tuple[str, str]:
         """Use de Bruijn graph to align two sequences
 
         Returns:
-            Tuple[str]: the tuple of aligned sequences
+            Tuple[str, str]: the tuple of aligned sequences
         """
         # if there's no merge node, apply global alignment
         if not self.merge_node_idx:
