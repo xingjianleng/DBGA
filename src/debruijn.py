@@ -464,6 +464,11 @@ class deBruijn:
                 rtn.append(edge_kmer)
             else:
                 rtn.append(read_debruijn_edge_kmer(edge_kmer, self.k))
+
+        # if the next node is not end node, then it should be a merge node
+        # last_node_idx = bubble_idx_seq[-1]
+        # if not self.nodes[last_node_idx].node_type is NodeType.end:
+        #     rtn.append(self._read_from_kmer(last_node_idx, seq_idx=seq_idx))
         return "".join(rtn)
 
     def _bubble_aln(
@@ -472,25 +477,31 @@ class deBruijn:
         bubble_indicies_seq2: List[int],
         prev_edge_read1: str = "",
         prev_edge_read2: str = "",
+        prev_merge: str = "",
     ) -> Tuple[str, str]:
         """Align the bubbles in the de Bruijn graph
 
         Args:
             bubble_idx_seq1 (List[int]): the list containing indices of nodes of seq1 in the bubble
             bubble_idx_seq2 (List[int]): the list containing indices of nodes of seq2 in the bubble
-            edge_read1 (str, optional): the edge kmer from the edge of the last merge node for seq1. Defaults to "".
-            edge_read2 (str, optional): the edge kmer from the edge of the last merge node for seq2. Defaults to "".
+            prev_edge_read1 (str, optional): the edge kmer from the edge of the last merge node for seq1. Defaults to "".
+            prev_edge_read2 (str, optional): the edge kmer from the edge of the last merge node for seq2. Defaults to "".
+            prev_merge (str, optional): the previous merge node nucleotide. Defaults to "".
 
         Returns:
             Tuple[str, str]: the aligned sequences from the bubble in the de Bruijn graph
         """
+        # short cut for faster experiments
+        if (
+            len(bubble_indicies_seq1) == len(bubble_indicies_seq2) == 1
+            and prev_edge_read1 == prev_edge_read2 == ""
+        ):
+            return prev_merge, prev_merge
+
         # extract original bubble sequences
-        bubble_seq1_str = (
-            f"{prev_edge_read1}{self._extract_bubble(bubble_indicies_seq1, 0)}"
-        )
-        bubble_seq2_str = (
-            f"{prev_edge_read2}{self._extract_bubble(bubble_indicies_seq2, 1)}"
-        )
+        bubble_seq1_str = f"{prev_merge}{prev_edge_read1}{self._extract_bubble(bubble_indicies_seq1, 0)}"
+        bubble_seq2_str = f"{prev_merge}{prev_edge_read2}{self._extract_bubble(bubble_indicies_seq2, 1)}"
+
         # call the global_aln function to compute the global alignment of two sequences
         return dna_global_aln(bubble_seq1_str, bubble_seq2_str)
 
@@ -553,7 +564,7 @@ class deBruijn:
                 bubble_idx_seq2.append(self.seq_node_idx[1][seq2_idx])
                 seq2_idx += 1
 
-            # if index overflow here, it must be the edge case, call LCS function
+            # if index overflow here, it must be the edge case, call fix function
             if seq1_idx == len(self.seq_node_idx[0]) or seq2_idx == len(
                 self.seq_node_idx[1]
             ):
@@ -568,12 +579,21 @@ class deBruijn:
             bubble_idx_seq1.append(merge_idx)
             bubble_idx_seq2.append(merge_idx)
 
+            prev_merge: str = (
+                self._read_from_kmer(self.merge_node_idx[i - 1], 0) if i > 0 else ""
+            )
+
+            # get alignment of the bubble (with previous merge node nucleotide)
             bubble_alignment = self._bubble_aln(
                 bubble_indicies_seq1=bubble_idx_seq1,
                 bubble_indicies_seq2=bubble_idx_seq2,
                 prev_edge_read1=merge_edge_read_seq1,
                 prev_edge_read2=merge_edge_read_seq2,
+                prev_merge=prev_merge,
             )
+
+            aln_seq1 = bubble_alignment[0][1:] if i > 0 else bubble_alignment[0]
+            aln_seq2 = bubble_alignment[1][1:] if i > 0 else bubble_alignment[1]
 
             if i != len(self.merge_node_idx) - 1:
                 # extract the duplicate kmer on the merge node out edge
@@ -584,16 +604,12 @@ class deBruijn:
                     seq2_next_idx=self.seq_node_idx[1][seq2_idx + 1],
                 )
 
-                seq1_res.extend(
-                    [bubble_alignment[0], self._read_from_kmer(merge_idx, 0)]
-                )
-                seq2_res.extend(
-                    [bubble_alignment[1], self._read_from_kmer(merge_idx, 1)]
-                )
+                seq1_res.extend([aln_seq1, self._read_from_kmer(merge_idx, 0)])
+                seq2_res.extend([aln_seq2, self._read_from_kmer(merge_idx, 1)])
             else:
                 # only put the bubble alignment to the result, leave the merge node to further alignment
-                seq1_res.append(bubble_alignment[0])
-                seq2_res.append(bubble_alignment[1])
+                seq1_res.append(aln_seq1)
+                seq2_res.append(aln_seq2)
 
                 # store the last merge node
                 bubble_idx_seq1, bubble_idx_seq2 = [merge_idx], [merge_idx]
