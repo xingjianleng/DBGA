@@ -168,14 +168,14 @@ def test_mapping_shift():
     seq2 = "GTACAAGCGA"
     db = deBruijn([seq1, seq2], k=3, moltype="dna")
     shift_res = mapping_shifts(db)
-    assert shift_res == {"node_indicies": [2, 4, 5, 6, 7], "shifts": [-1, 1, 1, 1, 1]}
+    assert shift_res == {"node_indices": [2, 4, 5, 6, 7], "shifts": [-1, 1, 1, 1, 1]}
 
     # Test case 2
     seq1 = "TACCACGTAAT"
     seq2 = "TACGACCTAAT"
     db = deBruijn([seq1, seq2], k=3, moltype="dna")
     shift_res = mapping_shifts(db)
-    assert shift_res == {"node_indicies": [1, 2, 5, 8, 9], "shifts": [0, 3, -3, 0, 0]}
+    assert shift_res == {"node_indices": [1, 2, 5, 8, 9], "shifts": [0, 3, -3, 0, 0]}
 
     # Test case 3
     seq1 = "TACCGTCCAGACGTAAT"
@@ -183,7 +183,7 @@ def test_mapping_shift():
     db = deBruijn([seq1, seq2], k=3, moltype="dna")
     shift_res = mapping_shifts(db)
     assert shift_res == {
-        "node_indicies": [1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13],
+        "node_indices": [1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13],
         "shifts": [0, 9, 1, 1, 1, 1, 1, 1, -8, 2, 2],
     }
 
