@@ -179,99 +179,126 @@ def to_DOT(nodes: List[Node]) -> graphviz.Digraph:  # pragma: no cover
     return dot
 
 
+def chebyshev(arr: np.ndarray) -> np.ndarray:
+    """Use Chebyshev to calculate outliers
+
+    Parameters
+    ----------
+    arr : np.ndarray
+        the array of data points
+
+    Returns
+    -------
+    np.ndarray
+        the ndarray of booleans indicating whether the element is an outlier
+    """
+    mean = np.mean(arr)
+    std = np.std(arr, ddof=1)
+    cheb = 3 * std
+
+    outliers = np.logical_or(arr < (mean - cheb), arr > (mean + cheb))
+    assert outliers.shape == arr.shape
+    return outliers
+
+
 def filter_outliers(
-    indicies: np.ndarray, arr: np.ndarray
-) -> Tuple[np.ndarray, np.ndarray]:
+    indices: np.ndarray, arr: np.ndarray, window: int, thresh
+) -> np.ndarray:
     """Filter outliers in a given array
 
     Parameters
     ----------
-    indicies : np.ndarray
-        the indicies of each array element
+    indices : np.ndarray
+        the indices of each array element
     arr : np.ndarray
         the array elements
+    window : int
+        the window size for local Chebyshev algorithm
+    thresh : float
+        the threshold for a data point to be considered as an outlier.
 
     Returns
     -------
-    Tuple[np.ndarray, np.ndarray]
-        the tuple of (indicies, arr) after filtering
+    np.ndarray
+        the list of indices after filtering
 
     """
-    # use Chebyshev to filter remaining outliers
-    while True:
-        mean = np.mean(arr)
-        std = np.std(arr, ddof=1)
-        cheb = 3 * std
+    # use local Chebyshev to filter remaining outliers
+    assert indices.shape == arr.shape
+    window_num = indices.size - window + 1
+    outlier_count = np.zeros_like(indices)
+    for i in range(window_num):
+        outlier_count[i : i + window] += chebyshev(arr=arr[i : i + window])
 
-        outliers = np.logical_or(arr < (mean - cheb), arr > (mean + cheb))
-
-        # when too many data points are considered as outliers / no data is outlier, stop filtering
-        if sum(outliers) > 0.01 * len(indicies) or sum(outliers) == 0:
-            break
-
-        arr = arr[~outliers]
-        indicies = indicies[~outliers]
-
-    # filter outliers with histogram count < 5, it works well only with large input data
-    counts, intervals = np.histogram(arr)
-
-    for i, count in enumerate(counts):
-        if count < 5:
-            outliers = np.logical_and(arr >= intervals[i], arr <= intervals[i + 1])
-            arr = arr[~outliers]
-            indicies = indicies[~outliers]
-    return indicies, arr
+    inliers = outlier_count <= window * thresh
+    return indices[inliers]
 
 
-def mapping_shifts(
-    db, elim_outliers: bool = False, visualize: bool = False
-) -> Dict[str, List[int]]:
-    """The function to plot the shifting of indicies of matched kmers
+def merge_indices_fix(db: deBruijn, window: int, thresh: float = 0.1) -> List[int]:
+    """Fix function when cycle in merge node indices list can be observed
 
     Parameters
     ----------
-    db : Any
+    db : deBruijn
         a deBruijn graph object of two sequences
-    elim_outliers : bool, optional
-        whether eliminate outliers in shifts. Defaults to False
+    window : int
+        the window size for local Chebyshev algorithm
+    thresh : float, optional
+        the threshold for a data point to be considered as an outlier. Defaults to 0.1
+
+    Returns
+    -------
+    List[int]
+        the fixed merge node indices list
+
+    """
+    merge_shifts = mapping_shifts(db)
+    indices_arr = np.array(merge_shifts["node_indices"])
+    shifts_arr = np.array(merge_shifts["shifts"])
+    filtered_indices = filter_outliers(
+        indices_arr, shifts_arr, window=window, thresh=thresh
+    )
+    return filtered_indices.tolist()
+
+
+def mapping_shifts(db: deBruijn, visualize: bool = False) -> Dict[str, List[int]]:
+    """The function to plot the shifting of indices of matched kmers
+
+    Parameters
+    ----------
+    db : deBruijn
+        a deBruijn graph object of two sequences
     visualize : bool, optional
         whether show the visualization of the shifts plot. Defaults to False
 
     Returns
     -------
     Dict[List[int], List[int]]
-        the dictionary containing merge_node_indicies and the shift values
+        the dictionary containing merge_node_indices and the shift values
 
     """
     # db should be in type deBruijn
     assert isinstance(db, deBruijn)
 
-    sorted_merge_lst: List[int] = sorted(db.merge_node_idx)
+    sorted_merge: List[int] = sorted(db.merge_node_idx)
 
     # convert data to numpy array for easier calculation
-    shifts: np.ndarray = np.array(
-        [
-            db.seq_node_idx[1].index(merge_idx) - db.seq_node_idx[0].index(merge_idx)
-            for merge_idx in sorted_merge_lst
-        ]
-    )
-    sorted_merge_arr: np.ndarray = np.array(sorted_merge_lst)
-
-    # filter outliers in shifts
-    if elim_outliers:  # pragma: no cover
-        sorted_merge_arr, shifts = filter_outliers(sorted_merge_arr, shifts)
+    shifts = [
+        db.seq_node_idx[1].index(merge_idx) - db.seq_node_idx[0].index(merge_idx)
+        for merge_idx in sorted_merge
+    ]
 
     merge_shifts = {
-        "node_indicies": sorted_merge_arr.tolist(),
-        "shifts": shifts.tolist(),
+        "node_indices": sorted_merge,
+        "shifts": shifts,
     }
 
     if visualize:  # pragma: no cover
         figure = px.line(
             merge_shifts,
-            x="node_indicies",
+            x="node_indices",
             y="shifts",
-            title="Matching shifts over merge node indicies based on sequence 1",
+            title="Matching shifts over merge node indices based on sequence 1",
             markers=True,
         )
         figure.show()
@@ -392,13 +419,15 @@ class deBruijn:
     nodes : Dict[int, Node]
         the map from NodeID to Node object
     seq_node_idx : Dict[int, List[int]]
-        the map from sequence ID to the list of Node indicies from that sequence
+        the map from sequence ID to the list of Node indices from that sequence
     merge_node_idx : List[int]
-        the list of Node indicies
+        the list of Node indices
     sequences : np.ndarray
         the sequences contained in the de Bruijn graph
     num_seq : int
         number of sequences in the de Bruijn graph
+    avg_len : int
+        average length of sequences
 
     """
 
@@ -476,7 +505,7 @@ class deBruijn:
         """
         self.nodes[out_id].add_out_edge(in_id, duplicate_str=duplicate_str)
 
-    def _get_seq_kmer_indicies(
+    def _get_seq_kmer_indices(
         self, kmers: List[str], duplicate_kmer: Set[str]
     ) -> List[int]:
         """Add kmers (of a sequence) to the de Bruijn graph, also get their indices
@@ -547,7 +576,7 @@ class deBruijn:
         duplicate_kmer = duplicate_kmers(kmer_seqs=kmer_seqs)
         # add nodes to de Bruijn graph
         for i, kmer_seq in enumerate(kmer_seqs):
-            self.seq_node_idx[i] = self._get_seq_kmer_indicies(
+            self.seq_node_idx[i] = self._get_seq_kmer_indices(
                 kmers=kmer_seq, duplicate_kmer=duplicate_kmer
             )
 
@@ -640,8 +669,8 @@ class deBruijn:
 
     def _bubble_aln(
         self,
-        bubble_indicies_seq1: List[int],
-        bubble_indicies_seq2: List[int],
+        bubble_indices_seq1: List[int],
+        bubble_indices_seq2: List[int],
         prev_edge_read1: str = "",
         prev_edge_read2: str = "",
         prev_merge: str = "",
@@ -669,14 +698,14 @@ class deBruijn:
         """
         # short cut for faster experiments
         if (
-            len(bubble_indicies_seq1) == len(bubble_indicies_seq2) == 1
+            len(bubble_indices_seq1) == len(bubble_indices_seq2) == 1
             and prev_edge_read1 == prev_edge_read2 == ""
         ):
             return prev_merge, prev_merge
 
         # extract original bubble sequences
-        bubble_seq1_str = f"{prev_merge}{prev_edge_read1}{self._extract_bubble(bubble_indicies_seq1, 0)}"
-        bubble_seq2_str = f"{prev_merge}{prev_edge_read2}{self._extract_bubble(bubble_indicies_seq2, 1)}"
+        bubble_seq1_str = f"{prev_merge}{prev_edge_read1}{self._extract_bubble(bubble_indices_seq1, 0)}"
+        bubble_seq2_str = f"{prev_merge}{prev_edge_read2}{self._extract_bubble(bubble_indices_seq2, 1)}"
 
         # call the global_aln function to compute the global alignment of two sequences
         return dna_global_aln(bubble_seq1_str, bubble_seq2_str)
@@ -759,9 +788,7 @@ class deBruijn:
                 self.seq_node_idx[1]
             ):
                 print("Fix starts")
-                self.merge_node_idx = mapping_shifts(self, elim_outliers=True)[
-                    "node_indicies"
-                ]
+                self.merge_node_idx = merge_indices_fix(self, 50)
                 print("Fix ends")
                 return self.to_alignment()
 
@@ -775,8 +802,8 @@ class deBruijn:
 
             # get alignment of the bubble (with previous merge node nucleotide)
             bubble_alignment = self._bubble_aln(
-                bubble_indicies_seq1=bubble_idx_seq1,
-                bubble_indicies_seq2=bubble_idx_seq2,
+                bubble_indices_seq1=bubble_idx_seq1,
+                bubble_indices_seq2=bubble_idx_seq2,
                 prev_edge_read1=merge_edge_read_seq1,
                 prev_edge_read2=merge_edge_read_seq2,
                 prev_merge=prev_merge,
@@ -816,8 +843,8 @@ class deBruijn:
             seq2_idx += 1
 
         bubble_alignment = self._bubble_aln(
-            bubble_indicies_seq1=bubble_idx_seq1,
-            bubble_indicies_seq2=bubble_idx_seq2,
+            bubble_indices_seq1=bubble_idx_seq1,
+            bubble_indices_seq2=bubble_idx_seq2,
         )
 
         seq1_res.append(bubble_alignment[0])
