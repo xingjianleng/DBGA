@@ -79,10 +79,10 @@ def gbparser():
 
 
 if __name__ == "__main__":
-    # files_count = 5
-    # path = Path("../data/raw/corona-unaligned.fasta")
-    # processed_path = Path("../data/processed")
-    # for i in range(files_count):
-    #     with open(f"{processed_path}/similar-{i + 1}.fasta", "w") as f:
-    #         f.write(dict_to_fasta(sample_similar_seqs(path, moltype="dna")))
-    gbparser()
+    files_count = 1
+    path = Path("../data/raw/ebola.fasta")
+    processed_path = Path("../data/processed")
+    for i in range(files_count):
+        with open(f"{processed_path}/similar-{i + 1}.fasta", "w") as f:
+            f.write(dict_to_fasta(sample_random_seqs(path, moltype="dna")))
+    # gbparser()

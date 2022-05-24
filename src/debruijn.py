@@ -282,7 +282,7 @@ def mapping_shifts(db: deBruijn, visualize: bool = False) -> Dict[str, List[int]
 
     sorted_merge: List[int] = sorted(db.merge_node_idx)
 
-    # convert data to numpy array for easier calculation
+    # TODO: Need a more efficient way to calculate/memorize the indices
     shifts = [
         db.seq_node_idx[1].index(merge_idx) - db.seq_node_idx[0].index(merge_idx)
         for merge_idx in sorted_merge
@@ -454,6 +454,11 @@ class deBruijn:
         self.seq_last_kmer_idx: List[int] = []
         self.sequences: np.ndarray = load_sequences(data=data, moltype=moltype)
         self.num_seq: int = len(self.sequences)
+        self.avg_len = 0
+        # calculate the average sequences length
+        for seq in self.sequences:
+            self.avg_len += len(seq)
+        self.avg_len /= self.num_seq
         self.add_debruijn()
 
     def _add_node(self, kmer: str = "", node_type: NodeType = NodeType.middle) -> int:
@@ -788,7 +793,10 @@ class deBruijn:
                 self.seq_node_idx[1]
             ):
                 print("Fix starts")
-                self.merge_node_idx = merge_indices_fix(self, 50)
+                # a more general way to determine the window size, avg_len / 600
+                self.merge_node_idx = merge_indices_fix(
+                    self, max(round(self.avg_len / 600), 40)
+                )
                 print("Fix ends")
                 return self.to_alignment()
 
