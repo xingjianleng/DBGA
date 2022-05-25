@@ -1,53 +1,26 @@
 from pathlib import Path
-from random import choice, sample
+from random import sample
 
 
 from cogent3.parse.genbank import RichGenbankParser
 from cogent3 import load_unaligned_seqs, make_unaligned_seqs
 
 
-# TODO: Need to think of a better way to decide two sequences are similar
-def is_similar_seqs_corona(name1: str, name2: str) -> bool:
-    return name1[:2] == name2[:2]
-
-
-def sample_similar_seqs(path: Path, moltype: str) -> dict:
-    """Randomly sample two similar sequences from the fasta file
-
-    Args:
-        path (Path): the Path object of the fasta file
-        moltype (str, optional): molecule type
-
-    Returns:
-        dict: dictionary of the randomly sampled sequences with {sequence_name: sequence}
-    """
-    seqs = load_unaligned_seqs(path, moltype=moltype)
-
-    while True:
-        first_seq_name = choice(seqs.names)
-        second_seq_name_options = [
-            name
-            for name in seqs.names
-            if name != first_seq_name and is_similar_seqs_corona(first_seq_name, name)
-        ]
-        if second_seq_name_options:
-            break
-    second_seq_name = choice(second_seq_name_options)
-    return {
-        first_seq_name: seqs.get_seq(first_seq_name),
-        second_seq_name: seqs.get_seq(second_seq_name),
-    }
-
-
 def sample_random_seqs(path: Path, moltype: str) -> dict:
     """Randomly sample two sequences from the fasta file
 
-    Args:
-        path (Path): the Path object of the fasta file
-        moltype (str, optional): the molecular type in the sequence
+    Parameters
+    ----------
+    path : Path
+        the Path object of the fasta file
+    moltype : str
+        the molecular type in the sequence
 
-    Returns:
-        dict: dictionary of the randomly sampled sequences with {sequence_name: sequence}
+    Returns
+    -------
+    dict
+        dictionary of the randomly sampled sequences with {sequence_name: sequence}
+
     """
     seqs = load_unaligned_seqs(path, moltype=moltype)
     chosen_seq_names = sample(seqs.names, k=2)
@@ -57,32 +30,49 @@ def sample_random_seqs(path: Path, moltype: str) -> dict:
 def dict_to_fasta(seqs: dict) -> str:
     """Convert a dictionary of sequences into fasta format
 
-    Args:
-        seqs (dict): dictionary containing sequences with {name: sequence}
-        moltype (str, optional): the molecular type in the sequence
+    Parameters
+    ----------
+    seqs : dict
+        dictionary containing sequences with {name: sequence}
+    moltype : str
+        the molecular type in the sequence
 
-    Returns:
-        str: the fasta representation of sequences
+    Returns
+    -------
+    str
+        the fasta representation of sequences
+
     """
     seqs_collection = make_unaligned_seqs(seqs)
     return seqs_collection.to_fasta()
 
 
-def gbparser():
-    path = "../data/raw/mers.gb"
-    with open(path, "r") as infile:
+def gbparser(in_path: str, out_path: str) -> None:
+    """Parser for genbank files
+
+    Parameters
+    ----------
+    in_path: str :
+        path to the input .gb file
+    out_path: str :
+        path to the output fasta file
+
+    Returns
+    -------
+
+    """
+    with open(in_path, "r") as infile:
         n, seq = list(RichGenbankParser(infile, moltype="dna"))[0]
     seq_collection = make_unaligned_seqs({n: seq}, moltype="dna")
-    path_fasta = "../data/processed/mers.fasta"
-    with open(path_fasta, "w") as f:
+    with open(out_path, "w") as f:
         f.write(seq_collection.to_fasta())
 
 
 if __name__ == "__main__":
-    files_count = 1
+    files_count = 2
     path = Path("../data/raw/ebola.fasta")
     processed_path = Path("../data/processed")
     for i in range(files_count):
         with open(f"{processed_path}/similar-{i + 1}.fasta", "w") as f:
             f.write(dict_to_fasta(sample_random_seqs(path, moltype="dna")))
-    # gbparser()
+    # gbparser("../data/raw/mers.gb", "../data/processed/mers.fasta")

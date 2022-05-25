@@ -179,7 +179,7 @@ def to_DOT(nodes: List[Node]) -> graphviz.Digraph:  # pragma: no cover
     return dot
 
 
-def chebyshev(arr: np.ndarray) -> np.ndarray:
+def chebyshev(arr: np.ndarray) -> np.ndarray:  # pragma: no cover
     """Use Chebyshev to calculate outliers
 
     Parameters
@@ -203,7 +203,7 @@ def chebyshev(arr: np.ndarray) -> np.ndarray:
 
 def filter_outliers(
     indices: np.ndarray, arr: np.ndarray, window: int, thresh
-) -> np.ndarray:
+) -> np.ndarray:  # pragma: no cover
     """Filter outliers in a given array
 
     Parameters
@@ -234,7 +234,9 @@ def filter_outliers(
     return indices[inliers]
 
 
-def merge_indices_fix(db: deBruijn, window: int, thresh: float = 0.1) -> List[int]:
+def merge_indices_fix(
+    db: deBruijn, window: int, thresh: float = 0.1
+) -> List[int]:  # pragma: no cover
     """Fix function when cycle in merge node indices list can be observed
 
     Parameters
