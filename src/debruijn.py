@@ -861,3 +861,19 @@ class deBruijn:
         seq2_res.append(bubble_alignment[1])
 
         return "".join(seq1_res), "".join(seq2_res)
+
+
+# TODO: Check the fragement input to the cogent3 alignment
+if __name__ == "__main__":
+    d = deBruijn(
+        "~/repos/COMP3770-xingjian/data/processed/influenza-similar1.fasta", 12, "dna"
+    )
+    # d = deBruijn("~/repos/COMP3770-xingjian/data/processed/corona-similar1.fasta", 13, "dna")
+    # mapping_shifts(d, True)
+    # d.merge_node_idx = merge_indices_fix(d, 40)
+    # mapping_shifts(d, True)
+    with open("debruijn_aln_influenza1_k12.fasta", "w") as f:
+        aln = d.to_alignment()
+        f.write(aln[0])
+        f.write("\n\n\n")
+        f.write(aln[1])

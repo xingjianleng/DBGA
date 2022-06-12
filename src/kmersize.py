@@ -28,8 +28,8 @@ def calculate_k(path: Path, thresh: int, moltype: str):
 
 
 if __name__ == "__main__":
-    path = Path("../data/processed/ebola-similar2.fasta").expanduser().absolute()
-    thresh = 0.0025
+    path = Path("../data/processed/influenza-similar1.fasta").expanduser().absolute()
+    thresh = 0.001
 
     k = calculate_k(path=path, thresh=thresh, moltype="dna")
     print(f"The smallest k value for only {thresh * 100}% duplicate kmers: {k}")
