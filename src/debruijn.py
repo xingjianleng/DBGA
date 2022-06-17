@@ -12,10 +12,6 @@ from cogent3 import load_unaligned_seqs, make_unaligned_seqs
 from cogent3 import SequenceCollection
 
 
-# scoring dict for aligning bubbles
-s = make_dna_scoring_dict(10, -1, -8)
-
-
 def read_debruijn_edge_kmer(seq: str, k: int) -> str:
     """Read the kmer(s) contained in edges in a de Bruijn graph
 
@@ -121,7 +117,9 @@ def duplicate_kmers(kmer_seqs: List[List[str]]) -> Set[str]:
     return duplicate_set
 
 
-def dna_global_aln(seq1: str, seq2: str) -> Tuple[str, str]:
+def dna_global_aln(
+    seq1: str, seq2: str, s: Dict[Tuple[str, str], int], d: int, e: int
+) -> Tuple[str, str]:
     """Align the sequences in bubbles with node indices provided
 
     Parameters
@@ -132,6 +130,12 @@ def dna_global_aln(seq1: str, seq2: str) -> Tuple[str, str]:
         the second sequence to align
     moltype : str
         the molecular type in the sequence
+    s : Dict[Tuple[str, str], int]
+        the DNA scoring matrix
+    d : int
+        gap open costs
+    e : int
+        gap extend costs
 
     Returns
     -------
@@ -141,7 +145,7 @@ def dna_global_aln(seq1: str, seq2: str) -> Tuple[str, str]:
     """
     if seq1 and seq2:
         seq_colllection = make_unaligned_seqs({0: seq1, 1: seq2}, moltype="dna")
-        partial_aln = global_pairwise(*seq_colllection.seqs, s, 10, 2)
+        partial_aln = global_pairwise(*seq_colllection.seqs, s, d, e)
         return str(partial_aln.seqs[0]), str(partial_aln.seqs[1])
     elif seq1:
         return seq1, "-" * len(seq1)
@@ -678,6 +682,9 @@ class deBruijn:
         self,
         bubble_indices_seq1: List[int],
         bubble_indices_seq2: List[int],
+        s: Dict[Tuple[str, str], int],
+        d: int,
+        e: int,
         prev_edge_read1: str = "",
         prev_edge_read2: str = "",
         prev_merge: str = "",
@@ -690,6 +697,12 @@ class deBruijn:
             the list containing indices of nodes of seq1 in the bubble
         bubble_idx_seq2 : List[int]
             the list containing indices of nodes of seq2 in the bubble
+        s : Dict[Tuple[str, str], int]
+            the DNA scoring matrix
+        d : int
+            gap open costs
+        e : int
+            gap extend costs
         prev_edge_read1 : str, optional
             the edge kmer from the edge of the last merge node for seq1. Defaults to "".
         prev_edge_read2 : str, optional
@@ -715,7 +728,7 @@ class deBruijn:
         bubble_seq2_str = f"{prev_merge}{prev_edge_read2}{self._extract_bubble(bubble_indices_seq2, 1)}"
 
         # call the global_aln function to compute the global alignment of two sequences
-        return dna_global_aln(bubble_seq1_str, bubble_seq2_str)
+        return dna_global_aln(bubble_seq1_str, bubble_seq2_str, s=s, d=d, e=e)
 
     def _get_merge_edge(
         self,
@@ -754,11 +767,28 @@ class deBruijn:
         merge_edge_read_seq2 = read_debruijn_edge_kmer(seq2_edge_kmer, self.k)
         return merge_edge_read_seq1, merge_edge_read_seq2
 
-    def to_alignment(self) -> Tuple[str, str]:
+    def to_alignment(
+        self,
+        match: int = 10,
+        transition: int = -1,
+        transversion: int = -8,
+        d: int = 10,
+        e: int = 2,
+    ) -> Tuple[str, str]:
         """Use de Bruijn graph to align two sequences
 
         Parameters
         ----------
+        match : int
+            score for two matching nucleotide
+        transition : int
+            cost for DNA transition mutation
+        transversion : int
+            cost for DNA transversion mutation
+        d : int
+            gap open costs. Defaults to 10
+        e : int
+            gap extend costs. Defaults to 2
 
         Returns
         -------
@@ -769,6 +799,11 @@ class deBruijn:
         # if there's no merge node, apply global alignment
         if not self.merge_node_idx:
             return dna_global_aln(str(self.sequences[0]), str(self.sequences[1]))
+
+        # scoring dict for aligning bubbles
+        s = make_dna_scoring_dict(
+            match=match, transition=transition, transversion=transversion
+        )
 
         seq1_idx, seq2_idx = 0, 0
         seq1_res, seq2_res = [], []
@@ -814,6 +849,9 @@ class deBruijn:
             bubble_alignment = self._bubble_aln(
                 bubble_indices_seq1=bubble_idx_seq1,
                 bubble_indices_seq2=bubble_idx_seq2,
+                s=s,
+                d=d,
+                e=e,
                 prev_edge_read1=merge_edge_read_seq1,
                 prev_edge_read2=merge_edge_read_seq2,
                 prev_merge=prev_merge,
@@ -855,6 +893,9 @@ class deBruijn:
         bubble_alignment = self._bubble_aln(
             bubble_indices_seq1=bubble_idx_seq1,
             bubble_indices_seq2=bubble_idx_seq2,
+            s=s,
+            d=d,
+            e=e,
         )
 
         seq1_res.append(bubble_alignment[0])
