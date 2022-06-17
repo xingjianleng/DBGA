@@ -1,13 +1,16 @@
+from cogent3.align import make_dna_scoring_dict
+from cogent3.format.fasta import alignment_to_fasta
 from cogent3.core.alphabet import AlphabetError
+from cogent3 import SequenceCollection
 import pytest
 
 from src.debruijn import *
 
 
 def sequence_loader_checker(seqs, exp_seq1: str, exp_seq2: str):
-    assert isinstance(seqs, np.ndarray)
-    assert seqs[0] == exp_seq1
-    assert seqs[1] == exp_seq2
+    assert isinstance(seqs, SequenceCollection)
+    assert seqs.seqs[0] == exp_seq1
+    assert seqs.seqs[1] == exp_seq2
 
 
 # checker for check the kmer length is satisfied
@@ -20,8 +23,8 @@ def kmer_length_checker(debruijn: deBruijn):
 # fasta example checker framework
 def example_checker(seqs, k, exp_seq1_idx, exp_seq2_idx, exp_merge, exp_aln):
     # expected sequence should be the same as degapped aligned sequences
-    exp_seq1 = exp_aln[0][0].replace("-", "")
-    exp_seq2 = exp_aln[0][1].replace("-", "")
+    exp_seq1 = exp_aln[0].replace("-", "")
+    exp_seq2 = exp_aln[1].replace("-", "")
 
     # all testing examples are DNA sequences
     db = deBruijn(seqs, k, moltype="dna")
@@ -47,7 +50,8 @@ def example_checker(seqs, k, exp_seq1_idx, exp_seq2_idx, exp_merge, exp_aln):
     # two aligned sequences should have the same length
     aln_result = db.to_alignment()
     assert len(aln_result[0]) == len(aln_result[1])
-    assert aln_result in exp_aln
+    exp_aln_fasta = alignment_to_fasta({"seq1": exp_aln[0], "seq2": exp_aln[1]})
+    assert aln_result == exp_aln_fasta
 
     # merge node Ids should be the same as expectation
     # NOTE: this should be checked at last, because db.to_alignment() could possibly reset this list
@@ -110,18 +114,23 @@ def test_load_sequences():
 
 
 def test_global_aln():
+    # parameters used for alignment tests
+    s = make_dna_scoring_dict(10, -1, -8)
+    d = 10
+    e = 2
+
     # one sequence is empty tests
     seq1 = ""
     seq2 = "ACG"
-    assert dna_global_aln(seq1=seq1, seq2=seq2) == ("---", "ACG")
+    assert dna_global_aln(seq1=seq1, seq2=seq2, s=s, d=d, e=e) == ("---", "ACG")
     seq1 = "CTA"
     seq2 = ""
-    assert dna_global_aln(seq1=seq1, seq2=seq2) == ("CTA", "---")
+    assert dna_global_aln(seq1=seq1, seq2=seq2, s=s, d=d, e=e) == ("CTA", "---")
 
     # simple alignment test
     seq1 = "GGATCGA"
     seq2 = "GAATTCAGTTA"
-    assert dna_global_aln(seq1=seq1, seq2=seq2) in [
+    assert dna_global_aln(seq1=seq1, seq2=seq2, s=s, d=d, e=e) in [
         ("GGA-TC-G--A", "GAATTCAGTTA"),
         ("GGAT-C-G--A", "GAATTCAGTTA"),
     ]
@@ -213,7 +222,7 @@ def test_substitution_middle():
         exp_seq1_idx=list(range(10)),
         exp_seq2_idx=[10, 1, 2, 3, 11, 12, 13, 7, 8, 14],
         exp_merge=[1, 2, 3, 7, 8],
-        exp_aln=[(seq1, seq2)],
+        exp_aln=(seq1, seq2),
     )
 
 
@@ -227,7 +236,7 @@ def test_gap_bubble_duplicate():
         exp_seq1_idx=list(range(9)),
         exp_seq2_idx=[9, 1, 2, 3, 4, 10, 11, 7, 12],
         exp_merge=[1, 2, 3, 4, 7],
-        exp_aln=[(seq1, seq2)],
+        exp_aln=(seq1, seq2),
     )
 
 
@@ -241,7 +250,7 @@ def test_gap_at_end():
         exp_seq1_idx=list(range(12)),
         exp_seq2_idx=[12, 1, 2, 3, 4, 5, 6, 7, 8, 13],
         exp_merge=[1, 2, 3, 4, 5, 6, 7, 8],
-        exp_aln=[(seq1, seq2)],
+        exp_aln=(seq1, seq2),
     )
 
 
@@ -255,7 +264,7 @@ def test_gap_at_start():
         exp_seq1_idx=list(range(11)),
         exp_seq2_idx=[11, 2, 3, 4, 5, 6, 7, 8, 9, 12],
         exp_merge=[2, 3, 4, 5, 6, 7, 8, 9],
-        exp_aln=[(seq1, seq2)],
+        exp_aln=(seq1, seq2),
     )
 
 
@@ -269,7 +278,7 @@ def test_bubble_consecutive_duplicate():
         exp_seq1_idx=list(range(7)),
         exp_seq2_idx=[7, 1, 2, 8, 9, 10, 4, 5, 11],
         exp_merge=[1, 2, 4, 5],
-        exp_aln=[(seq1, seq2)],
+        exp_aln=(seq1, seq2),
     )
 
 
@@ -283,7 +292,7 @@ def test_duplicate_unbalanced_end():
         exp_seq1_idx=list(range(11)),
         exp_seq2_idx=[11, 1, 12, 13, 14, 5, 6, 7, 8, 15],
         exp_merge=[1, 5, 6, 7, 8],
-        exp_aln=[(seq1, seq2)],
+        exp_aln=(seq1, seq2),
     )
 
 
@@ -298,7 +307,7 @@ def test_unbalanced_end_w_duplicate():
         exp_seq1_idx=list(range(11)),
         exp_seq2_idx=[11, 1, 12, 13, 14, 5, 6, 7, 8, 15],
         exp_merge=[1, 5, 6, 7, 8],
-        exp_aln=[(seq1, seq2)],
+        exp_aln=(seq1, seq2),
     )
 
 
@@ -313,7 +322,7 @@ def test_duplicate_kmer_in_bubble():
         exp_seq1_idx=list(range(9)),
         exp_seq2_idx=[9, 1, 10, 11, 7, 12],
         exp_merge=[1, 7],
-        exp_aln=[(seq1, seq2)],
+        exp_aln=(seq1, seq2),
     )
 
 
@@ -328,7 +337,7 @@ def test_both_end_duplicate():
         exp_seq1_idx=list(range(6)),
         exp_seq2_idx=[6, 7, 8, 9, 3, 4, 10],
         exp_merge=[3, 4],
-        exp_aln=[(seq1, seq2)],
+        exp_aln=(seq1, seq2),
     )
 
 
@@ -342,7 +351,7 @@ def test_unrelated_sequences():
         exp_seq1_idx=list(range(8)),
         exp_seq2_idx=list(range(8, 18)),
         exp_merge=[],
-        exp_aln=[(seq1, seq2)],
+        exp_aln=(seq1, seq2),
     )
 
 

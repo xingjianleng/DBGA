@@ -4,10 +4,12 @@ from collections import Counter
 from typing import Any, Dict, List, Tuple, Set
 from pathlib import Path
 
+import click
 import graphviz
 import numpy as np
 import plotly.express as px
 from cogent3.align import global_pairwise, make_dna_scoring_dict
+from cogent3.format.fasta import alignment_to_fasta
 from cogent3 import load_unaligned_seqs, make_unaligned_seqs
 from cogent3 import SequenceCollection
 
@@ -33,7 +35,7 @@ def read_debruijn_edge_kmer(seq: str, k: int) -> str:
     return "".join(rtn)
 
 
-def load_sequences(data: Any, moltype: str) -> np.ndarray:
+def load_sequences(data: Any, moltype: str) -> SequenceCollection:
     """Load the sequences and transform it into numpy array of strings (in Unicode)
 
     Parameters
@@ -45,8 +47,8 @@ def load_sequences(data: Any, moltype: str) -> np.ndarray:
 
     Returns
     -------
-    np.ndarray
-        the numpy array containing the loaded sequences
+    SequenceCollection
+        the SequenceCollection object of the loaded sequences
 
     Raises
     ------
@@ -61,8 +63,7 @@ def load_sequences(data: Any, moltype: str) -> np.ndarray:
     elif isinstance(data, list) and all(isinstance(elem, str) for elem in data):
         data = make_unaligned_seqs(data, moltype=moltype)
     if isinstance(data, SequenceCollection):
-        seqs_lst = [str(seq) for seq in data.iter_seqs()]
-        return np.array(seqs_lst)
+        return data
     else:
         raise ValueError("Invalid input for sequence argument")
 
@@ -451,6 +452,7 @@ class deBruijn:
         -------
 
         """
+        sc: SequenceCollection = load_sequences(data=data, moltype=moltype)
         self.id_count = 0
         self.k = k
         self.nodes: Dict[int, Node] = {}
@@ -458,9 +460,11 @@ class deBruijn:
         self.seq_node_idx: Dict[int, List[int]] = {}
         self.merge_node_idx: List[int] = []
         self.seq_last_kmer_idx: List[int] = []
-        self.sequences: np.ndarray = load_sequences(data=data, moltype=moltype)
+        self.moltype: str = moltype
+        self.names: Tuple[Any, ...] = tuple(sc.names)
+        self.sequences: Tuple[str, ...] = tuple([str(seq) for seq in sc.seqs])
         self.num_seq: int = len(self.sequences)
-        self.avg_len = 0
+        self.avg_len = 0.0
         # calculate the average sequences length
         for seq in self.sequences:
             self.avg_len += len(seq)
@@ -774,7 +778,7 @@ class deBruijn:
         transversion: int = -8,
         d: int = 10,
         e: int = 2,
-    ) -> Tuple[str, str]:
+    ) -> str:
         """Use de Bruijn graph to align two sequences
 
         Parameters
@@ -792,18 +796,23 @@ class deBruijn:
 
         Returns
         -------
-        Tuple[str, str]
-            the tuple of aligned sequences
+        str
+            the fasta representation of the alignment result
 
         """
-        # if there's no merge node, apply global alignment
-        if not self.merge_node_idx:
-            return dna_global_aln(str(self.sequences[0]), str(self.sequences[1]))
-
         # scoring dict for aligning bubbles
         s = make_dna_scoring_dict(
             match=match, transition=transition, transversion=transversion
         )
+
+        # if there's no merge node, apply global alignment
+        if not self.merge_node_idx:
+            alignment = dna_global_aln(
+                str(self.sequences[0]), str(self.sequences[1]), s=s, d=d, e=e
+            )
+            return alignment_to_fasta(
+                {self.names[0]: alignment[0], self.names[1]: alignment[1]}
+            )
 
         seq1_idx, seq2_idx = 0, 0
         seq1_res, seq2_res = [], []
@@ -901,20 +910,59 @@ class deBruijn:
         seq1_res.append(bubble_alignment[0])
         seq2_res.append(bubble_alignment[1])
 
-        return "".join(seq1_res), "".join(seq2_res)
+        return alignment_to_fasta(
+            {self.names[0]: "".join(seq1_res), self.names[1]: "".join(seq2_res)}
+        )
 
 
-# TODO: Check the fragement input to the cogent3 alignment
+@click.command()
+@click.option(
+    "--infile", type=str, required=True, help="input unaligned sequences file"
+)
+@click.option(
+    "--outfile", type=str, required=True, help="output aligned file destination"
+)
+@click.option("--k", type=int, required=True, help="kmer size")
+@click.option(
+    "--moltype",
+    default="dna",
+    type=str,
+    required=False,
+    help="molecular type of sequences",
+)
+@click.option(
+    "--match",
+    default=10,
+    type=int,
+    required=False,
+    help="score for two matching nucleotide",
+)
+@click.option(
+    "--transition",
+    default=-1,
+    type=int,
+    required=False,
+    help="cost for DNA transition mutation",
+)
+@click.option(
+    "--transversion",
+    default=-8,
+    type=int,
+    required=False,
+    help="cost for DNA transversion mutation",
+)
+@click.option(
+    "--d", default=10, type=int, required=False, help="costs for opening a gap"
+)
+@click.option(
+    "--e", default=2, type=int, required=False, help="costs for extending a gap"
+)
+def cli(infile, outfile, k, moltype, match, transition, transversion, d, e):
+    debruijn = deBruijn(infile, k, moltype)
+    aln = debruijn.to_alignment(match, transition, transversion, d, e)
+    with open(outfile, "w") as f:
+        f.write(aln)
+
+
 if __name__ == "__main__":
-    d = deBruijn(
-        "~/repos/COMP3770-xingjian/data/processed/influenza-similar1.fasta", 12, "dna"
-    )
-    # d = deBruijn("~/repos/COMP3770-xingjian/data/processed/corona-similar1.fasta", 13, "dna")
-    # mapping_shifts(d, True)
-    # d.merge_node_idx = merge_indices_fix(d, 40)
-    # mapping_shifts(d, True)
-    with open("debruijn_aln_influenza1_k12.fasta", "w") as f:
-        aln = d.to_alignment()
-        f.write(aln[0])
-        f.write("\n\n\n")
-        f.write(aln[1])
+    cli()
