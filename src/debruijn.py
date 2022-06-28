@@ -1,17 +1,17 @@
 from __future__ import annotations
-from enum import Enum, auto
 from collections import Counter
-from typing import Any, Dict, List, Tuple, Set
+from enum import Enum, auto
 from pathlib import Path
+from typing import Any, Dict, List, Tuple, Set
 
 import click
-import graphviz
-import numpy as np
-import plotly.express as px
 from cogent3.align import global_pairwise, make_dna_scoring_dict
 from cogent3.format.fasta import alignment_to_fasta
 from cogent3 import load_unaligned_seqs, make_unaligned_seqs
 from cogent3 import SequenceCollection
+import graphviz
+import numpy as np
+import plotly.express as px
 
 
 def read_debruijn_edge_kmer(seq: str, k: int) -> str:
@@ -464,11 +464,8 @@ class deBruijn:
         self.names: Tuple[Any, ...] = tuple(sc.names)
         self.sequences: Tuple[str, ...] = tuple([str(seq) for seq in sc.seqs])
         self.num_seq: int = len(self.sequences)
-        self.avg_len = 0.0
         # calculate the average sequences length
-        for seq in self.sequences:
-            self.avg_len += len(seq)
-        self.avg_len /= self.num_seq
+        self.avg_len = sum(map(len, self.sequences)) / len(self.sequences)
         self.add_debruijn()
 
     def _add_node(self, kmer: str = "", node_type: NodeType = NodeType.middle) -> int:
@@ -960,7 +957,8 @@ class deBruijn:
 def cli(infile, outfile, k, moltype, match, transition, transversion, d, e):
     debruijn = deBruijn(infile, k, moltype)
     aln = debruijn.to_alignment(match, transition, transversion, d, e)
-    with open(outfile, "w") as f:
+    out_path = Path(outfile)
+    with open(f"{out_path.stem}_k{k}{out_path.suffix}", "w") as f:
         f.write(aln)
 
 

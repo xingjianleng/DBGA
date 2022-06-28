@@ -1,6 +1,7 @@
+import click
+from collections import Counter
 from cogent3 import load_unaligned_seqs
 from pathlib import Path
-from collections import Counter
 
 
 def kmers(seq: str, k: int):
@@ -27,9 +28,22 @@ def calculate_k(path: Path, thresh: int, moltype: str):
     return current_k
 
 
-if __name__ == "__main__":
-    path = Path("../data/processed/influenza-similar1.fasta").expanduser().absolute()
-    thresh = 0.001
-
+@click.command()
+@click.option(
+    "--infile", type=str, required=True, help="input unaligned sequences file"
+)
+@click.option(
+    "--thresh",
+    type=float,
+    default=0.001,
+    required=False,
+    help="Proportion of duplicate kmers im each sequence",
+)
+def cli(infile, thresh):
+    path = Path(infile).expanduser().absolute()
     k = calculate_k(path=path, thresh=thresh, moltype="dna")
     print(f"The smallest k value for only {thresh * 100}% duplicate kmers: {k}")
+
+
+if __name__ == "__main__":
+    cli()
