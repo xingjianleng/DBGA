@@ -48,13 +48,13 @@ def example_checker(seqs, k, exp_seq1_idx, exp_seq2_idx, exp_merge, exp_aln):
             assert db.nodes[i].node_type is NodeType.middle
 
     # two aligned sequences should have the same length
-    aln_result = db.to_alignment()
+    aln_result = to_alignment(dbg=db)
     assert len(aln_result[0]) == len(aln_result[1])
     exp_aln_fasta = alignment_to_fasta({"seq1": exp_aln[0], "seq2": exp_aln[1]})
     assert aln_result == exp_aln_fasta
 
     # merge node Ids should be the same as expectation
-    # NOTE: this should be checked at last, because db.to_alignment() could possibly reset this list
+    # NOTE: this should be checked at last, because to_alignment(db) could possibly reset this list
     assert db.merge_node_idx == exp_merge
 
 

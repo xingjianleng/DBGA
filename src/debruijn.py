@@ -2,7 +2,7 @@ from __future__ import annotations
 from collections import Counter
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, Set
+from typing import Any, Dict, List, Tuple, Set, Union
 
 import click
 from cogent3.align import global_pairwise, make_dna_scoring_dict
@@ -425,11 +425,19 @@ class deBruijn:
         the kmer size of the de Bruijn graph
     nodes : Dict[int, Node]
         the map from NodeID to Node object
+    exist_kmer : Dict[str, int]
+        currently existing kmer in de Bruijn graph, stored in form of (kmer: NodeID)
     seq_node_idx : Dict[int, List[int]]
         the map from sequence ID to the list of Node indices from that sequence
     merge_node_idx : List[int]
         the list of Node indices
-    sequences : np.ndarray
+    seq_last_kmer_id : List[int]
+        the NodeID for last kmer in each sequence
+    moltype : str
+        the molecular type for characters in sequences
+    names : Tuple[Any, ...]
+        the sequences names
+    sequences : Tuple[str, ...]
         the sequences contained in the de Bruijn graph
     num_seq : int
         number of sequences in the de Bruijn graph
@@ -465,7 +473,7 @@ class deBruijn:
         self.sequences: Tuple[str, ...] = tuple([str(seq) for seq in sc.seqs])
         self.num_seq: int = len(self.sequences)
         # calculate the average sequences length
-        self.avg_len = sum(map(len, self.sequences)) / len(self.sequences)
+        self.avg_len = sum(map(len, self.sequences)) / self.num_seq
         self.add_debruijn()
 
     def _add_node(self, kmer: str = "", node_type: NodeType = NodeType.middle) -> int:
@@ -622,7 +630,7 @@ class deBruijn:
             dot_file_path = file_path.with_suffix(".DOT")
             digraph.save(dot_file_path)
 
-    def _read_from_kmer(self, node_idx: int, seq_idx: int) -> str:
+    def read_from_kmer(self, node_idx: int, seq_idx: int) -> str:
         """Read nucleotide(s) from the kmer with provided index
 
         Parameters
@@ -642,8 +650,36 @@ class deBruijn:
         kmer = self.nodes[node_idx].kmer
         return kmer if node_idx == self.seq_last_kmer_idx[seq_idx] else kmer[0]
 
-    def _extract_bubble(self, bubble_idx_seq: List[int], seq_idx: int) -> str:
-        """Extract the string from the bubble from indices of nodes
+    def extract_bubble_indicies(self) -> List[List[Union[int, List[int]]]]:
+        """Extract indicies of bubbles and merge nodes of sequences in the de Bruijn graph
+
+        Returns
+        -------
+        List[List[Union[int, List[int]]]]
+            List of indicies of bubbles and merge nodes of sequences in the de Bruijn graph
+        """
+        expansion = []
+        for seq_idx in range(self.num_seq):
+            bubbles = []
+            bubble = []
+            beginning = True
+            for node_idx in self.seq_node_idx[seq_idx]:
+                if self.nodes[node_idx].node_type not in {NodeType.start, NodeType.end}:
+                    if node_idx not in self.merge_node_idx:
+                        bubble.append(node_idx)
+                    else:
+                        if bubble or beginning:
+                            bubbles.append(bubble)
+                            bubble = []
+                            beginning = False
+                        bubbles.append(node_idx)
+            bubbles.append(bubble)
+            expansion.append(bubbles)
+        assert all(elem == len(expansion[0]) for elem in map(len, expansion))
+        return expansion
+
+    def extract_bubble_seq(self, bubble_idx_seq: List[int], seq_idx: int) -> str:
+        """Extract the string from the bubble with indices of nodes
 
         Parameters
         ----------
@@ -655,7 +691,7 @@ class deBruijn:
         Returns
         -------
         str
-            the string from the bubble from indices of nodes
+            the string from the bubble with indices of nodes
 
         """
         assert seq_idx in {0, 1}
@@ -663,7 +699,7 @@ class deBruijn:
         for i in range(len(bubble_idx_seq) - 1):
             node_idx = bubble_idx_seq[i]
             if self.nodes[node_idx].node_type not in [NodeType.start, NodeType.end]:
-                rtn.append(self._read_from_kmer(node_idx, seq_idx))
+                rtn.append(self.read_from_kmer(node_idx, seq_idx))
             next_node_idx = bubble_idx_seq[i + 1]
             # if the next node is the end of sequence, read edge fully,
             # otherwise, read the first char
@@ -679,7 +715,7 @@ class deBruijn:
         #     rtn.append(self._read_from_kmer(last_node_idx, seq_idx=seq_idx))
         return "".join(rtn)
 
-    def _bubble_aln(
+    def bubble_aln(
         self,
         bubble_indices_seq1: List[int],
         bubble_indices_seq2: List[int],
@@ -725,13 +761,13 @@ class deBruijn:
             return prev_merge, prev_merge
 
         # extract original bubble sequences
-        bubble_seq1_str = f"{prev_merge}{prev_edge_read1}{self._extract_bubble(bubble_indices_seq1, 0)}"
-        bubble_seq2_str = f"{prev_merge}{prev_edge_read2}{self._extract_bubble(bubble_indices_seq2, 1)}"
+        bubble_seq1_str = f"{prev_merge}{prev_edge_read1}{self.extract_bubble_seq(bubble_indices_seq1, 0)}"
+        bubble_seq2_str = f"{prev_merge}{prev_edge_read2}{self.extract_bubble_seq(bubble_indices_seq2, 1)}"
 
         # call the global_aln function to compute the global alignment of two sequences
         return dna_global_aln(bubble_seq1_str, bubble_seq2_str, s=s, d=d, e=e)
 
-    def _get_merge_edge(
+    def get_merge_edge(
         self,
         seq1_curr_idx: int,
         seq1_next_idx: int,
@@ -768,148 +804,147 @@ class deBruijn:
         merge_edge_read_seq2 = read_debruijn_edge_kmer(seq2_edge_kmer, self.k)
         return merge_edge_read_seq1, merge_edge_read_seq2
 
-    def to_alignment(
-        self,
-        match: int = 10,
-        transition: int = -1,
-        transversion: int = -8,
-        d: int = 10,
-        e: int = 2,
-    ) -> str:
-        """Use de Bruijn graph to align two sequences
 
-        Parameters
-        ----------
-        match : int
-            score for two matching nucleotide
-        transition : int
-            cost for DNA transition mutation
-        transversion : int
-            cost for DNA transversion mutation
-        d : int
-            gap open costs. Defaults to 10
-        e : int
-            gap extend costs. Defaults to 2
+def to_alignment(
+    dbg: deBruijn,
+    match: int = 10,
+    transition: int = -1,
+    transversion: int = -8,
+    d: int = 10,
+    e: int = 2,
+) -> str:
+    """Use de Bruijn graph to align two sequences
 
-        Returns
-        -------
-        str
-            the fasta representation of the alignment result
+    Parameters
+    ----------
+    match : int
+        score for two matching nucleotide
+    transition : int
+        cost for DNA transition mutation
+    transversion : int
+        cost for DNA transversion mutation
+    d : int
+        gap open costs. Defaults to 10
+    e : int
+        gap extend costs. Defaults to 2
 
-        """
-        # scoring dict for aligning bubbles
-        s = make_dna_scoring_dict(
-            match=match, transition=transition, transversion=transversion
+    Returns
+    -------
+    str
+        the fasta representation of the alignment result
+
+    """
+    # scoring dict for aligning bubbles
+    s = make_dna_scoring_dict(
+        match=match, transition=transition, transversion=transversion
+    )
+
+    # if there's no merge node, apply global alignment
+    if not dbg.merge_node_idx:
+        alignment = dna_global_aln(
+            str(dbg.sequences[0]), str(dbg.sequences[1]), s=s, d=d, e=e
+        )
+        return alignment_to_fasta(
+            {dbg.names[0]: alignment[0], dbg.names[1]: alignment[1]}
         )
 
-        # if there's no merge node, apply global alignment
-        if not self.merge_node_idx:
-            alignment = dna_global_aln(
-                str(self.sequences[0]), str(self.sequences[1]), s=s, d=d, e=e
-            )
-            return alignment_to_fasta(
-                {self.names[0]: alignment[0], self.names[1]: alignment[1]}
-            )
+    seq1_idx, seq2_idx = 0, 0
+    seq1_res, seq2_res = [], []
+    merge_edge_read_seq1, merge_edge_read_seq2 = "", ""
 
-        seq1_idx, seq2_idx = 0, 0
-        seq1_res, seq2_res = [], []
-        merge_edge_read_seq1, merge_edge_read_seq2 = "", ""
-
-        for i, merge_idx in enumerate(self.merge_node_idx):
-            bubble_idx_seq1, bubble_idx_seq2 = [], []
-            while (
-                seq1_idx < len(self.seq_node_idx[0])
-                and self.seq_node_idx[0][seq1_idx] != merge_idx
-            ):
-                bubble_idx_seq1.append(self.seq_node_idx[0][seq1_idx])
-                seq1_idx += 1
-
-            while (
-                seq2_idx < len(self.seq_node_idx[1])
-                and self.seq_node_idx[1][seq2_idx] != merge_idx
-            ):
-                bubble_idx_seq2.append(self.seq_node_idx[1][seq2_idx])
-                seq2_idx += 1
-
-            # if index overflow here, it must be the edge case, call fix function
-            if seq1_idx == len(self.seq_node_idx[0]) or seq2_idx == len(
-                self.seq_node_idx[1]
-            ):
-                print("Fix starts")
-                # a more general way to determine the window size, avg_len / 600
-                self.merge_node_idx = merge_indices_fix(
-                    self, max(round(self.avg_len / 600), 40)
-                )
-                print("Fix ends")
-                return self.to_alignment()
-
-            # add the merge node index to the list
-            bubble_idx_seq1.append(merge_idx)
-            bubble_idx_seq2.append(merge_idx)
-
-            prev_merge: str = (
-                self._read_from_kmer(self.merge_node_idx[i - 1], 0) if i > 0 else ""
-            )
-
-            # get alignment of the bubble (with previous merge node nucleotide)
-            bubble_alignment = self._bubble_aln(
-                bubble_indices_seq1=bubble_idx_seq1,
-                bubble_indices_seq2=bubble_idx_seq2,
-                s=s,
-                d=d,
-                e=e,
-                prev_edge_read1=merge_edge_read_seq1,
-                prev_edge_read2=merge_edge_read_seq2,
-                prev_merge=prev_merge,
-            )
-
-            aln_seq1 = bubble_alignment[0][1:] if i > 0 else bubble_alignment[0]
-            aln_seq2 = bubble_alignment[1][1:] if i > 0 else bubble_alignment[1]
-
-            if i != len(self.merge_node_idx) - 1:
-                # extract the duplicate kmer on the merge node out edge
-                merge_edge_read_seq1, merge_edge_read_seq2 = self._get_merge_edge(
-                    seq1_curr_idx=self.seq_node_idx[0][seq1_idx],
-                    seq1_next_idx=self.seq_node_idx[0][seq1_idx + 1],
-                    seq2_curr_idx=self.seq_node_idx[1][seq2_idx],
-                    seq2_next_idx=self.seq_node_idx[1][seq2_idx + 1],
-                )
-
-                seq1_res.extend([aln_seq1, self._read_from_kmer(merge_idx, 0)])
-                seq2_res.extend([aln_seq2, self._read_from_kmer(merge_idx, 1)])
-            else:
-                # only put the bubble alignment to the result, leave the merge node to further alignment
-                seq1_res.append(aln_seq1)
-                seq2_res.append(aln_seq2)
-
-                # store the last merge node
-                bubble_idx_seq1, bubble_idx_seq2 = [merge_idx], [merge_idx]
-
-            seq1_idx += 1
-            seq2_idx += 1
-
-        while seq1_idx < len(self.seq_node_idx[0]):
-            bubble_idx_seq1.append(self.seq_node_idx[0][seq1_idx])
+    for i, merge_idx in enumerate(dbg.merge_node_idx):
+        bubble_idx_seq1, bubble_idx_seq2 = [], []
+        while (
+            seq1_idx < len(dbg.seq_node_idx[0])
+            and dbg.seq_node_idx[0][seq1_idx] != merge_idx
+        ):
+            bubble_idx_seq1.append(dbg.seq_node_idx[0][seq1_idx])
             seq1_idx += 1
 
-        while seq2_idx < len(self.seq_node_idx[1]):
-            bubble_idx_seq2.append(self.seq_node_idx[1][seq2_idx])
+        while (
+            seq2_idx < len(dbg.seq_node_idx[1])
+            and dbg.seq_node_idx[1][seq2_idx] != merge_idx
+        ):
+            bubble_idx_seq2.append(dbg.seq_node_idx[1][seq2_idx])
             seq2_idx += 1
 
-        bubble_alignment = self._bubble_aln(
+        # if index overflow here, it must be the edge case, call fix function
+        if seq1_idx == len(dbg.seq_node_idx[0]) or seq2_idx == len(dbg.seq_node_idx[1]):
+            print("Fix starts")
+            # a more general way to determine the window size, avg_len / 600
+            dbg.merge_node_idx = merge_indices_fix(
+                dbg, max(round(dbg.avg_len / 600), 40)
+            )
+            print("Fix ends")
+            return dbg.to_alignment()
+
+        # add the merge node index to the list
+        bubble_idx_seq1.append(merge_idx)
+        bubble_idx_seq2.append(merge_idx)
+
+        prev_merge: str = (
+            dbg.read_from_kmer(dbg.merge_node_idx[i - 1], 0) if i > 0 else ""
+        )
+
+        # get alignment of the bubble (with previous merge node nucleotide)
+        bubble_alignment = dbg.bubble_aln(
             bubble_indices_seq1=bubble_idx_seq1,
             bubble_indices_seq2=bubble_idx_seq2,
             s=s,
             d=d,
             e=e,
+            prev_edge_read1=merge_edge_read_seq1,
+            prev_edge_read2=merge_edge_read_seq2,
+            prev_merge=prev_merge,
         )
 
-        seq1_res.append(bubble_alignment[0])
-        seq2_res.append(bubble_alignment[1])
+        aln_seq1 = bubble_alignment[0][1:] if i > 0 else bubble_alignment[0]
+        aln_seq2 = bubble_alignment[1][1:] if i > 0 else bubble_alignment[1]
 
-        return alignment_to_fasta(
-            {self.names[0]: "".join(seq1_res), self.names[1]: "".join(seq2_res)}
-        )
+        if i != len(dbg.merge_node_idx) - 1:
+            # extract the duplicate kmer on the merge node out edge
+            merge_edge_read_seq1, merge_edge_read_seq2 = dbg.get_merge_edge(
+                seq1_curr_idx=dbg.seq_node_idx[0][seq1_idx],
+                seq1_next_idx=dbg.seq_node_idx[0][seq1_idx + 1],
+                seq2_curr_idx=dbg.seq_node_idx[1][seq2_idx],
+                seq2_next_idx=dbg.seq_node_idx[1][seq2_idx + 1],
+            )
+
+            seq1_res.extend([aln_seq1, dbg.read_from_kmer(merge_idx, 0)])
+            seq2_res.extend([aln_seq2, dbg.read_from_kmer(merge_idx, 1)])
+        else:
+            # only put the bubble alignment to the result, leave the merge node to further alignment
+            seq1_res.append(aln_seq1)
+            seq2_res.append(aln_seq2)
+
+            # store the last merge node
+            bubble_idx_seq1, bubble_idx_seq2 = [merge_idx], [merge_idx]
+
+        seq1_idx += 1
+        seq2_idx += 1
+
+    while seq1_idx < len(dbg.seq_node_idx[0]):
+        bubble_idx_seq1.append(dbg.seq_node_idx[0][seq1_idx])
+        seq1_idx += 1
+
+    while seq2_idx < len(dbg.seq_node_idx[1]):
+        bubble_idx_seq2.append(dbg.seq_node_idx[1][seq2_idx])
+        seq2_idx += 1
+
+    bubble_alignment = dbg.bubble_aln(
+        bubble_indices_seq1=bubble_idx_seq1,
+        bubble_indices_seq2=bubble_idx_seq2,
+        s=s,
+        d=d,
+        e=e,
+    )
+
+    seq1_res.append(bubble_alignment[0])
+    seq2_res.append(bubble_alignment[1])
+
+    return alignment_to_fasta(
+        {dbg.names[0]: "".join(seq1_res), dbg.names[1]: "".join(seq2_res)}
+    )
 
 
 @click.command()
