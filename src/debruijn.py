@@ -689,7 +689,7 @@ class deBruijn:
         kmer = self.nodes[node_idx].kmer
         return kmer if node_idx == self.seq_last_kmer_idx[seq_idx] else kmer[0]
 
-    def extract_bubble_indicies(self) -> List[List[Union[int, List[int]]]]:
+    def extract_bubble(self) -> List[List[Union[int, List[int]]]]:
         """Extract indicies of bubbles and merge nodes of sequences in the de Bruijn graph
 
         Returns
