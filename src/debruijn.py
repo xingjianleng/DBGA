@@ -184,13 +184,15 @@ def to_DOT(nodes: List[Node]) -> graphviz.Digraph:  # pragma: no cover
     return dot
 
 
-def chebyshev(arr: np.ndarray) -> np.ndarray:  # pragma: no cover
+def chebyshev(arr: np.ndarray, coef: float) -> np.ndarray:  # pragma: no cover
     """Use Chebyshev to calculate outliers
 
     Parameters
     ----------
     arr : np.ndarray
         the array of data points
+    coef : float
+        the coefficient for how many standard deviations to be considered as an outlier
 
     Returns
     -------
@@ -199,15 +201,14 @@ def chebyshev(arr: np.ndarray) -> np.ndarray:  # pragma: no cover
     """
     mean = np.mean(arr)
     std = np.std(arr, ddof=1)
-    cheb = 3 * std
-
+    cheb = coef * std
     outliers = np.logical_or(arr < (mean - cheb), arr > (mean + cheb))
     assert outliers.shape == arr.shape
     return outliers
 
 
 def filter_outliers(
-    indices: np.ndarray, arr: np.ndarray, window: int, thresh
+    indices: np.ndarray, arr: np.ndarray, window: int, thresh: float, coef: float
 ) -> np.ndarray:  # pragma: no cover
     """Filter outliers in a given array
 
@@ -220,7 +221,9 @@ def filter_outliers(
     window : int
         the window size for local Chebyshev algorithm
     thresh : float
-        the threshold for a data point to be considered as an outlier.
+        the threshold for a data point to be considered as an outlier
+    coef : float
+        the coefficient for how many standard deviations to be considered as an outlier
 
     Returns
     -------
@@ -233,14 +236,14 @@ def filter_outliers(
     window_num = indices.size - window + 1
     outlier_count = np.zeros_like(indices)
     for i in range(window_num):
-        outlier_count[i : i + window] += chebyshev(arr=arr[i : i + window])
+        outlier_count[i : i + window] += chebyshev(arr[i : i + window], coef)
 
     inliers = outlier_count <= window * thresh
     return indices[inliers]
 
 
 def merge_indices_fix(
-    db: deBruijn, window: int, thresh: float = 0.1
+    db: deBruijn, thresh: float = 0.1
 ) -> List[int]:  # pragma: no cover
     """Fix function when cycle in merge node indices list can be observed
 
@@ -248,8 +251,6 @@ def merge_indices_fix(
     ----------
     db : deBruijn
         a deBruijn graph object of two sequences
-    window : int
-        the window size for local Chebyshev algorithm
     thresh : float, optional
         the threshold for a data point to be considered as an outlier. Defaults to 0.1
 
@@ -262,8 +263,18 @@ def merge_indices_fix(
     merge_shifts = mapping_shifts(db)
     indices_arr = np.array(merge_shifts["node_indices"])
     shifts_arr = np.array(merge_shifts["shifts"])
+    coef = min(
+        3, max(0.3, (db.avg_len + 4.4) / 18)
+    )  # heuristic to calculate coefficient
+    if db.avg_len <= 300:  # heuristic to calculate window size
+        window = max(5, round(db.avg_len / 15))
+    elif db.avg_len <= 1000:
+        window = max(20, round(db.avg_len / 25))
+    else:
+        window = max(40, round(db.avg_len / 600))
+    print(window, thresh, coef)
     filtered_indices = filter_outliers(
-        indices_arr, shifts_arr, window=window, thresh=thresh
+        indices_arr, shifts_arr, window=window, thresh=thresh, coef=coef
     )
     return filtered_indices.tolist()
 
@@ -871,12 +882,10 @@ def to_alignment(
         # if index overflow here, it must be the edge case, call fix function
         if seq1_idx == len(dbg.seq_node_idx[0]) or seq2_idx == len(dbg.seq_node_idx[1]):
             print("Fix starts")
-            # a more general way to determine the window size, avg_len / 600
-            dbg.merge_node_idx = merge_indices_fix(
-                dbg, max(round(dbg.avg_len / 600), 40)
-            )
+            # a heuristic way to determine the window size
+            dbg.merge_node_idx = merge_indices_fix(dbg)
             print("Fix ends")
-            return dbg.to_alignment()
+            return to_alignment(dbg)
 
         # add the merge node index to the list
         bubble_idx_seq1.append(merge_idx)
@@ -947,7 +956,7 @@ def to_alignment(
     )
 
 
-@click.command()
+@click.command()  # pragma: no cover
 @click.option(
     "--infile", type=str, required=True, help="input unaligned sequences file"
 )
@@ -990,12 +999,12 @@ def to_alignment(
     "--e", default=2, type=int, required=False, help="costs for extending a gap"
 )
 def cli(infile, outfile, k, moltype, match, transition, transversion, d, e):
-    debruijn = deBruijn(infile, k, moltype)
-    aln = debruijn.to_alignment(match, transition, transversion, d, e)
+    dbg = deBruijn(infile, k, moltype)
+    aln = to_alignment(dbg, match, transition, transversion, d, e)
     out_path = Path(outfile)
     with open(f"{out_path.stem}_k{k}{out_path.suffix}", "w") as f:
         f.write(aln)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     cli()

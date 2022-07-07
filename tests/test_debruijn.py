@@ -355,5 +355,33 @@ def test_unrelated_sequences():
     )
 
 
+def test_edge_case1():
+    # NOTE: Two sequences whose de Bruijn graph contain a circle
+    seq1 = "TACCACGTAAT"
+    seq2 = "TACGACCTAAT"
+    example_checker(
+        seqs="./tests/data/edge_case1.fasta",
+        k=3,
+        exp_seq1_idx=list(range(11)),
+        exp_seq2_idx=[11, 1, 5, 12, 13, 2, 14, 15, 8, 9, 16],
+        exp_merge=[1, 8, 9],
+        exp_aln=(seq1, seq2),
+    )
+
+
+def test_edge_case2():
+    # NOTE: Two sequences whose de Bruijn graph contain a more complex circle
+    seq1 = "TACCGTCCAGACGTAAT"
+    seq2 = "TACGGTCCAGACCTAAT"
+    example_checker(
+        seqs="./tests/data/edge_case2.fasta",
+        k=3,
+        exp_seq1_idx=list(range(15)),
+        exp_seq2_idx=[15, 1, 10, 16, 17, 4, 5, 6, 7, 8, 9, 2, 18, 19, 12, 13, 20],
+        exp_merge=[1, 4, 5, 6, 7, 8, 9, 12, 13],
+        exp_aln=(seq1, seq2),
+    )
+
+
 if __name__ == "__main__":
     pytest.main()
