@@ -1,4 +1,12 @@
+# Larger files
 /data/
 /benchmark/
+
+# tmp files and caches
 .coverage
 **/__pycache__
+
+# Developer
+.vscode/*
+.idea/*
+.DS_Store
