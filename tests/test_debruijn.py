@@ -61,21 +61,21 @@ def example_checker(seqs, k, exp_seq1_idx, exp_seq2_idx, exp_merge, exp_aln):
 def test_read_debruijn_edge_kmer():
     # empty string test case
     seq1 = ""
-    assert read_debruijn_edge_kmer(seq1, 3) == ""
+    assert read_nucleotide_from_kmers(seq1, 3) == ""
 
     # normal case, extract first char of kmer string test
     seq2 = "AOPKFNLSDOEPKPOWSEGH"
-    assert read_debruijn_edge_kmer(seq2, 4) == "AFDKS"
+    assert read_nucleotide_from_kmers(seq2, 4) == "AFDKS"
     seq3 = "1092831790"
-    assert read_debruijn_edge_kmer(seq3, 2) == "19819"
+    assert read_nucleotide_from_kmers(seq3, 2) == "19819"
 
     # length of sequence is not a multiple of k, raise error
     seq4 = "ACMDANFGL"
     with pytest.raises(AssertionError):
-        read_debruijn_edge_kmer(seq4, 4)
+        read_nucleotide_from_kmers(seq4, 4)
     seq5 = "109128903"
     with pytest.raises(AssertionError):
-        read_debruijn_edge_kmer(seq5, 2)
+        read_nucleotide_from_kmers(seq5, 2)
 
 
 def test_load_sequences():
@@ -134,6 +134,21 @@ def test_global_aln():
         ("GGA-TC-G--A", "GAATTCAGTTA"),
         ("GGAT-C-G--A", "GAATTCAGTTA"),
     ]
+
+
+def test_debruijn_merge_correctness():
+    # Outer-most list elements don't have equal length (cycle in de Bruijn graph)
+    test_lst1 = [[0, [1, 2], 3], [0, 3]]
+    assert debruijn_merge_correctness(test_lst1) == False
+    # Inner list elements don't have the same type (cycle in de Bruijn graph)
+    test_lst2 = [[0, [1, 2], 3], [0, 4, 3]]
+    assert debruijn_merge_correctness(test_lst2) == False
+    # Inner list int elements don't have the same value (cycle in de Bruijn graph)
+    test_lst3 = [[0, [1, 2], 3], [0, [6, 7], 4]]
+    assert debruijn_merge_correctness(test_lst3) == False
+    # True case, where merge node are consistent (same index), types are consistent
+    test_lst4 = [[0, [1, 2], 3], [0, [6, 7], 3]]
+    assert debruijn_merge_correctness(test_lst4) == True
 
 
 def test_get_kmers():

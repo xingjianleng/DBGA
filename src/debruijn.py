@@ -14,7 +14,7 @@ import numpy as np
 import plotly.express as px
 
 
-def read_debruijn_edge_kmer(seq: str, k: int) -> str:
+def read_nucleotide_from_kmers(seq: str, k: int) -> str:
     """Read the kmer(s) contained in edges in a de Bruijn graph
 
     Parameters
@@ -154,6 +154,34 @@ def dna_global_aln(
         return "-" * len(seq2), seq2
     else:
         return "", ""
+
+
+def debruijn_merge_correctness(
+    seqs_expansion: List[List[Union[int, List[int]]]]
+) -> bool:
+    """determine whether de Bruijn graph contains ambiguous cycles
+
+    Parameters
+    ----------
+    seqs_expansion : List[List[Union[int, List[int]]]]
+        the expansion of sequences into [bubble, merge ... merge, bubble] form
+
+    Returns
+    -------
+    bool
+        whether de Bruijn graph contains ambiguous cycles
+    """
+    if not all(elem == len(seqs_expansion[0]) for elem in map(len, seqs_expansion)):
+        return False
+    else:
+        for i in range(len(seqs_expansion[0])):
+            if type(seqs_expansion[0][i]) == type(seqs_expansion[1][i]) == int:
+                if not seqs_expansion[0][i] == seqs_expansion[1][i]:
+                    return False
+            else:
+                if not type(seqs_expansion[0][i]) == type(seqs_expansion[1][i]) == list:
+                    return False
+        return True
 
 
 def to_DOT(nodes: List[Node]) -> graphviz.Digraph:  # pragma: no cover
@@ -686,7 +714,6 @@ class deBruijn:
                         bubbles.append(node_idx)
             bubbles.append(bubble)
             expansion.append(bubbles)
-        assert all(elem == len(expansion[0]) for elem in map(len, expansion))
         return expansion
 
     def extract_bubble_seq(self, bubble_idx_seq: List[int], seq_idx: int) -> str:
@@ -718,7 +745,7 @@ class deBruijn:
             if self.nodes[next_node_idx].node_type is NodeType.end:
                 rtn.append(edge_kmer)
             else:
-                rtn.append(read_debruijn_edge_kmer(edge_kmer, self.k))
+                rtn.append(read_nucleotide_from_kmers(edge_kmer, self.k))
 
         # if the next node is not end node, then it should be a merge node
         # last_node_idx = bubble_idx_seq[-1]
@@ -811,8 +838,8 @@ class deBruijn:
             self.nodes[seq2_curr_idx].out_edges[seq2_next_idx].duplicate_str
         )
         # no chance that next node is End NodeType, we won't call this function for the last merge node
-        merge_edge_read_seq1 = read_debruijn_edge_kmer(seq1_edge_kmer, self.k)
-        merge_edge_read_seq2 = read_debruijn_edge_kmer(seq2_edge_kmer, self.k)
+        merge_edge_read_seq1 = read_nucleotide_from_kmers(seq1_edge_kmer, self.k)
+        merge_edge_read_seq2 = read_nucleotide_from_kmers(seq2_edge_kmer, self.k)
         return merge_edge_read_seq1, merge_edge_read_seq2
 
 
