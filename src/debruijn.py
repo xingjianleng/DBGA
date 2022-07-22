@@ -53,14 +53,16 @@ def load_sequences(data: Any, moltype: str) -> SequenceCollection:
     Raises
     ------
     ValueError
-        if the sequences parameter is not `path`, `SequenceCollection`, `list`
+        if the sequences parameter is not `path`, `SequenceCollection`, `list`, `tuple`
 
     """
 
     if isinstance(data, str):
         path = Path(data).expanduser().absolute()
         data = load_unaligned_seqs(path, moltype=moltype)
-    elif isinstance(data, list) and all(isinstance(elem, str) for elem in data):
+    elif (isinstance(data, list) or isinstance(data, tuple)) and all(
+        isinstance(elem, str) for elem in data
+    ):
         data = make_unaligned_seqs(data, moltype=moltype)
     if isinstance(data, SequenceCollection):
         return data
@@ -198,9 +200,10 @@ def to_DOT(nodes: List[Node]) -> graphviz.Digraph:  # pragma: no cover
         graphviz Digraph object representing the de Bruijn graph
 
     """
-    dot = graphviz.Digraph("de Bruijn")
+    # FIXME: Fix the code below according too the change in the out_edges dictionary
+    dot = graphviz.Digraph("de Bruijn graph")
     for node in nodes:
-        dot.node(str(node.id), node.kmer)
+        dot.node(str(node.id), f"{str(node.id)}.{node.kmer}")
     for node in nodes:
         for other_node, edge in node.out_edges.items():
             dot.edge(
@@ -432,7 +435,7 @@ class Node:
         self.out_edges: Dict[int, Edge] = {}
         self.count = 1
 
-    def add_out_edge(self, other_id: int, duplicate_str: str = "") -> None:
+    def add_out_edge(self, seq_idx: int, duplicate_str: str = "") -> None:
         """Add the edge from this node to other node
 
         Parameters
@@ -446,11 +449,11 @@ class Node:
         -------
 
         """
-        if other_id in self.out_edges:
-            self.out_edges[other_id].multiplicity += 1
+        if seq_idx in self.out_edges:
+            self.out_edges[seq_idx].multiplicity += 1
         else:
-            new_edge = Edge(self.id, other_id, duplicate_str=duplicate_str)
-            self.out_edges[other_id] = new_edge
+            new_edge = Edge(self.id, seq_idx, duplicate_str=duplicate_str)
+            self.out_edges[seq_idx] = new_edge
 
 
 class deBruijn:
@@ -514,6 +517,10 @@ class deBruijn:
         # calculate the average sequences length
         self.avg_len = sum(map(len, self.sequences)) / self.num_seq
         self.add_debruijn()
+        self.expansion = self.extract_bubble()
+        if not debruijn_merge_correctness(self.expansion):
+            self.merge_node_idx = merge_indices_fix(self)
+            self.expansion = self.extract_bubble()
 
     def _add_node(self, kmer: str = "", node_type: NodeType = NodeType.middle) -> int:
         """Add a single node to the de Bruijn graph
@@ -546,7 +553,7 @@ class deBruijn:
         self.id_count += 1
         return self.id_count - 1
 
-    def _add_edge(self, out_id: int, in_id: int, duplicate_str: str = "") -> None:
+    def _add_edge(self, out_id: int, seq_idx: int, duplicate_str: str = "") -> None:
         """Connect two kmers in the de Bruijn graph with an edge
 
         Parameters
@@ -562,10 +569,10 @@ class deBruijn:
         -------
 
         """
-        self.nodes[out_id].add_out_edge(in_id, duplicate_str=duplicate_str)
+        self.nodes[out_id].add_out_edge(seq_idx, duplicate_str=duplicate_str)
 
     def _get_seq_kmer_indices(
-        self, kmers: List[str], duplicate_kmer: Set[str]
+        self, kmers: List[str], duplicate_kmer: Set[str], seq_idx: int
     ) -> List[int]:
         """Add kmers (of a sequence) to the de Bruijn graph, also get their indices
 
@@ -595,13 +602,13 @@ class deBruijn:
                 # if there are duplicated kmers, store them in the edge
                 current_idx = self._add_node(kmer)
                 node_indices.append(current_idx)
-                self._add_edge(prev_idx, current_idx, "".join(edge_kmer))
+                self._add_edge(prev_idx, seq_idx, "".join(edge_kmer))
                 edge_kmer = []
             else:
                 # if there is no duplicated kmer, add new nodes
                 current_idx = self._add_node(kmer)
                 node_indices.append(current_idx)
-                self._add_edge(prev_idx, current_idx)
+                self._add_edge(prev_idx, seq_idx)
 
             # store the previous node index
             prev_idx = current_idx
@@ -614,7 +621,7 @@ class deBruijn:
         # create the terminal node and connect with the previous node
         end_node = self._add_node(kmer="", node_type=NodeType.end)
         node_indices.append(end_node)
-        self._add_edge(current_idx, end_node, "".join(edge_kmer))
+        self._add_edge(current_idx, seq_idx, "".join(edge_kmer))
         # return the sequence kmer indices
         return node_indices
 
@@ -636,7 +643,7 @@ class deBruijn:
         # add nodes to de Bruijn graph
         for i, kmer_seq in enumerate(kmer_seqs):
             self.seq_node_idx[i] = self._get_seq_kmer_indices(
-                kmers=kmer_seq, duplicate_kmer=duplicate_kmer
+                kmers=kmer_seq, duplicate_kmer=duplicate_kmer, seq_idx=i
             )
 
     def visualize(self, path: str, save_dot: bool = False) -> None:  # pragma: no cover
@@ -703,15 +710,15 @@ class deBruijn:
             bubble = []
             beginning = True
             for node_idx in self.seq_node_idx[seq_idx]:
-                if self.nodes[node_idx].node_type not in {NodeType.start, NodeType.end}:
-                    if node_idx not in self.merge_node_idx:
-                        bubble.append(node_idx)
-                    else:
-                        if bubble or beginning:
-                            bubbles.append(bubble)
-                            bubble = []
-                            beginning = False
-                        bubbles.append(node_idx)
+                # if self.nodes[node_idx].node_type not in {NodeType.start, NodeType.end}:
+                if node_idx not in self.merge_node_idx:
+                    bubble.append(node_idx)
+                else:
+                    if bubble or beginning:
+                        bubbles.append(bubble)
+                        bubble = []
+                        beginning = False
+                    bubbles.append(node_idx)
             bubbles.append(bubble)
             expansion.append(bubbles)
         return expansion
@@ -732,6 +739,7 @@ class deBruijn:
             the string from the bubble with indices of nodes
 
         """
+        # the last index will always representing the merge node or the end node (last bubble)
         assert seq_idx in {0, 1}
         rtn = []
         for i in range(len(bubble_idx_seq) - 1):
@@ -741,7 +749,7 @@ class deBruijn:
             next_node_idx = bubble_idx_seq[i + 1]
             # if the next node is the end of sequence, read edge fully,
             # otherwise, read the first char
-            edge_kmer = self.nodes[node_idx].out_edges[next_node_idx].duplicate_str
+            edge_kmer = self.nodes[node_idx].out_edges[seq_idx].duplicate_str
             if self.nodes[next_node_idx].node_type is NodeType.end:
                 rtn.append(edge_kmer)
             else:
@@ -750,7 +758,7 @@ class deBruijn:
         # if the next node is not end node, then it should be a merge node
         # last_node_idx = bubble_idx_seq[-1]
         # if not self.nodes[last_node_idx].node_type is NodeType.end:
-        #     rtn.append(self._read_from_kmer(last_node_idx, seq_idx=seq_idx))
+        #     rtn.append(self.read_from_kmer(last_node_idx, seq_idx=seq_idx))
         return "".join(rtn)
 
     def bubble_aln(
@@ -831,12 +839,8 @@ class deBruijn:
             the duplicate_kmer string for each sequence that is from the merge node
 
         """
-        seq1_edge_kmer = (
-            self.nodes[seq1_curr_idx].out_edges[seq1_next_idx].duplicate_str
-        )
-        seq2_edge_kmer = (
-            self.nodes[seq2_curr_idx].out_edges[seq2_next_idx].duplicate_str
-        )
+        seq1_edge_kmer = self.nodes[seq1_curr_idx].out_edges[0].duplicate_str
+        seq2_edge_kmer = self.nodes[seq2_curr_idx].out_edges[1].duplicate_str
         # no chance that next node is End NodeType, we won't call this function for the last merge node
         merge_edge_read_seq1 = read_nucleotide_from_kmers(seq1_edge_kmer, self.k)
         merge_edge_read_seq2 = read_nucleotide_from_kmers(seq2_edge_kmer, self.k)

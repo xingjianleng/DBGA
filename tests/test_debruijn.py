@@ -22,7 +22,7 @@ def kmer_length_checker(debruijn: deBruijn):
 
 # fasta example checker framework
 def example_checker(
-    seqs, k, exp_seq1_idx, exp_seq2_idx, exp_correct, exp_merge, exp_aln, exp_expansion
+    seqs, k, exp_seq1_idx, exp_seq2_idx, exp_correct, exp_merge, exp_aln
 ):
     # expected sequence should be the same as degapped aligned sequences
     exp_seq1 = exp_aln[0].replace("-", "")
@@ -61,12 +61,6 @@ def example_checker(
     # merge node IDs should be the same as expectation
     # NOTE: this should be checked at last, because to_alignment(db) could possibly reset this list
     assert db.merge_node_idx == exp_merge
-
-    # the expansion of sequences into [bubble, merge ... merge, bubble] should be the same
-    expansion_lst = db.extract_bubble()
-    assert expansion_lst == exp_expansion
-    # the expansion of sequences should be correctly merged, since to_alignment can fix cycles
-    assert debruijn_merge_correctness(expansion_lst) == True
 
 
 def test_read_debruijn_edge_kmer():
@@ -250,10 +244,6 @@ def test_substitution_middle():
         exp_correct=True,
         exp_merge=[1, 2, 3, 7, 8],
         exp_aln=(seq1, seq2),
-        exp_expansion=[
-            [[], 1, 2, 3, [4, 5, 6], 7, 8, []],
-            [[], 1, 2, 3, [11, 12, 13], 7, 8, []],
-        ],
     )
 
 
@@ -269,10 +259,6 @@ def test_gap_bubble_duplicate():
         exp_correct=True,
         exp_merge=[1, 2, 3, 4, 7],
         exp_aln=(seq1, seq2),
-        exp_expansion=[
-            [[], 1, 2, 3, 4, [5, 6], 7, []],
-            [[], 1, 2, 3, 4, [10, 11], 7, []],
-        ],
     )
 
 
@@ -288,10 +274,6 @@ def test_gap_at_end():
         exp_correct=True,
         exp_merge=[1, 2, 3, 4, 5, 6, 7, 8],
         exp_aln=(seq1, seq2),
-        exp_expansion=[
-            [[], 1, 2, 3, 4, 5, 6, 7, 8, [9, 10]],
-            [[], 1, 2, 3, 4, 5, 6, 7, 8, []],
-        ],
     )
 
 
@@ -307,10 +289,6 @@ def test_gap_at_start():
         exp_correct=True,
         exp_merge=[2, 3, 4, 5, 6, 7, 8, 9],
         exp_aln=(seq1, seq2),
-        exp_expansion=[
-            [[1], 2, 3, 4, 5, 6, 7, 8, 9, []],
-            [[], 2, 3, 4, 5, 6, 7, 8, 9, []],
-        ],
     )
 
 
@@ -326,7 +304,6 @@ def test_bubble_consecutive_duplicate():
         exp_correct=True,
         exp_merge=[1, 2, 4, 5],
         exp_aln=(seq1, seq2),
-        exp_expansion=[[[], 1, 2, [3], 4, 5, []], [[], 1, 2, [8, 9, 10], 4, 5, []]],
     )
 
 
@@ -342,10 +319,6 @@ def test_duplicate_unbalanced_end():
         exp_correct=True,
         exp_merge=[1, 5, 6, 7, 8],
         exp_aln=(seq1, seq2),
-        exp_expansion=[
-            [[], 1, [2, 3, 4], 5, 6, 7, 8, [9]],
-            [[], 1, [12, 13, 14], 5, 6, 7, 8, []],
-        ],
     )
 
 
@@ -362,10 +335,6 @@ def test_unbalanced_end_w_duplicate():
         exp_correct=True,
         exp_merge=[1, 5, 6, 7, 8],
         exp_aln=(seq1, seq2),
-        exp_expansion=[
-            [[], 1, [2, 3, 4], 5, 6, 7, 8, [9]],
-            [[], 1, [12, 13, 14], 5, 6, 7, 8, []],
-        ],
     )
 
 
@@ -382,7 +351,6 @@ def test_duplicate_kmer_in_bubble():
         exp_correct=True,
         exp_merge=[1, 7],
         exp_aln=(seq1, seq2),
-        exp_expansion=[[[], 1, [2, 3, 4, 5, 6], 7, []], [[], 1, [10, 11], 7, []]],
     )
 
 
@@ -399,7 +367,6 @@ def test_both_end_duplicate():
         exp_correct=True,
         exp_merge=[3, 4],
         exp_aln=(seq1, seq2),
-        exp_expansion=[[[1, 2], 3, 4, []], [[7, 8, 9], 3, 4, []]],
     )
 
 
@@ -415,7 +382,6 @@ def test_unrelated_sequences():
         exp_correct=True,
         exp_merge=[],
         exp_aln=(seq1, seq2),
-        exp_expansion=[[[1, 2, 3, 4, 5, 6]], [[9, 10, 11, 12, 13, 14, 15, 16]]],
     )
 
 
@@ -431,10 +397,6 @@ def test_edge_case1():
         exp_correct=False,
         exp_merge=[1, 8, 9],
         exp_aln=(seq1, seq2),
-        exp_expansion=[
-            [[], 1, [2, 3, 4, 5, 6, 7], 8, 9, []],
-            [[], 1, [5, 12, 13, 2, 14, 15], 8, 9, []],
-        ],
     )
 
 
@@ -450,10 +412,6 @@ def test_edge_case2():
         exp_correct=False,
         exp_merge=[1, 4, 5, 6, 7, 8, 9, 12, 13],
         exp_aln=(seq1, seq2),
-        exp_expansion=[
-            [[], 1, [2, 3], 4, 5, 6, 7, 8, 9, [10, 11], 12, 13, []],
-            [[], 1, [10, 16, 17], 4, 5, 6, 7, 8, 9, [2, 18, 19], 12, 13, []],
-        ],
     )
 
 
