@@ -205,7 +205,7 @@ def to_DOT(nodes: List[Node]) -> graphviz.Digraph:  # pragma: no cover
     for node in nodes:
         dot.node(str(node.id), f"{str(node.id)}.{node.kmer}")
     for node in nodes:
-        for other_node, edge in node.out_edges.items():
+        for other_node, edge in node.next_nodes.items():
             dot.edge(
                 tail_name=str(node.id),
                 head_name=str(other_node),
@@ -432,16 +432,23 @@ class Node:
         self.kmer = kmer
         self.node_type = node_type
         # the edge between two nodes won't be duplicate in the same direction
+        # out_edges maps from seq_idx to the corresponding out edge
         self.out_edges: Dict[int, Edge] = {}
+        # use the dictionary to map from next node index to the Edge object
+        self.next_nodes: Dict[int, Edge] = {}
         self.count = 1
 
-    def add_out_edge(self, seq_idx: int, duplicate_str: str = "") -> None:
+    def add_out_edge(
+        self, other_id: int, seq_idx: int, duplicate_str: str = ""
+    ) -> None:
         """Add the edge from this node to other node
 
         Parameters
         ----------
         other_id : int
             the terminal node id of the edge
+        seq_idx : int
+            the sequence index of the current kmer connection
         duplicated_str : str, optional
             the duplicated kmer represented by the edge. Defaults to ""
 
@@ -454,6 +461,7 @@ class Node:
         else:
             new_edge = Edge(self.id, seq_idx, duplicate_str=duplicate_str)
             self.out_edges[seq_idx] = new_edge
+            self.next_nodes[other_id] = new_edge
 
 
 class deBruijn:
@@ -553,7 +561,9 @@ class deBruijn:
         self.id_count += 1
         return self.id_count - 1
 
-    def _add_edge(self, out_id: int, seq_idx: int, duplicate_str: str = "") -> None:
+    def _add_edge(
+        self, out_id: int, in_id: int, seq_idx: int, duplicate_str: str = ""
+    ) -> None:
         """Connect two kmers in the de Bruijn graph with an edge
 
         Parameters
@@ -562,6 +572,8 @@ class deBruijn:
             the starting node id
         in_id : int
             the terminal node id
+        seq_idx : int
+            the sequence index of the current kmer connection
         duplicated_str : str, optional
             the duplicated kmer represented by the edge. Defaults to ""
 
@@ -569,7 +581,7 @@ class deBruijn:
         -------
 
         """
-        self.nodes[out_id].add_out_edge(seq_idx, duplicate_str=duplicate_str)
+        self.nodes[out_id].add_out_edge(in_id, seq_idx, duplicate_str=duplicate_str)
 
     def _get_seq_kmer_indices(
         self, kmers: List[str], duplicate_kmer: Set[str], seq_idx: int
@@ -602,13 +614,13 @@ class deBruijn:
                 # if there are duplicated kmers, store them in the edge
                 current_idx = self._add_node(kmer)
                 node_indices.append(current_idx)
-                self._add_edge(prev_idx, seq_idx, "".join(edge_kmer))
+                self._add_edge(prev_idx, current_idx, seq_idx, "".join(edge_kmer))
                 edge_kmer = []
             else:
                 # if there is no duplicated kmer, add new nodes
                 current_idx = self._add_node(kmer)
                 node_indices.append(current_idx)
-                self._add_edge(prev_idx, seq_idx)
+                self._add_edge(prev_idx, current_idx, seq_idx)
 
             # store the previous node index
             prev_idx = current_idx
@@ -621,7 +633,7 @@ class deBruijn:
         # create the terminal node and connect with the previous node
         end_node = self._add_node(kmer="", node_type=NodeType.end)
         node_indices.append(end_node)
-        self._add_edge(current_idx, seq_idx, "".join(edge_kmer))
+        self._add_edge(current_idx, end_node, seq_idx, "".join(edge_kmer))
         # return the sequence kmer indices
         return node_indices
 
