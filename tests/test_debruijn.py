@@ -204,7 +204,7 @@ def test_mapping_shift():
     seq2 = "TACGACCTAAT"
     db = deBruijn([seq1, seq2], k=3, moltype="dna")
     shift_res = mapping_shifts(db)
-    assert shift_res == {"node_indices": [1, 2, 5, 8, 9], "shifts": [0, 3, -3, 0, 0]}
+    assert shift_res == {"node_indices": [1, 8, 9], "shifts": [0, 0, 0]}
 
     # Test case 3
     seq1 = "TACCGTCCAGACGTAAT"
@@ -212,8 +212,8 @@ def test_mapping_shift():
     db = deBruijn([seq1, seq2], k=3, moltype="dna")
     shift_res = mapping_shifts(db)
     assert shift_res == {
-        "node_indices": [1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13],
-        "shifts": [0, 9, 1, 1, 1, 1, 1, 1, -8, 2, 2],
+        "node_indices": [1, 4, 5, 6, 7, 8, 9, 12, 13],
+        "shifts": [0, 1, 1, 1, 1, 1, 1, 2, 2],
     }
 
     # Test case 4
@@ -394,7 +394,7 @@ def test_edge_case1():
         k=3,
         exp_seq1_idx=list(range(11)),
         exp_seq2_idx=[11, 1, 5, 12, 13, 2, 14, 15, 8, 9, 16],
-        exp_correct=False,
+        exp_correct=True,
         exp_merge=[1, 8, 9],
         exp_aln=(seq1, seq2),
     )
@@ -409,7 +409,7 @@ def test_edge_case2():
         k=3,
         exp_seq1_idx=list(range(15)),
         exp_seq2_idx=[15, 1, 10, 16, 17, 4, 5, 6, 7, 8, 9, 2, 18, 19, 12, 13, 20],
-        exp_correct=False,
+        exp_correct=True,
         exp_merge=[1, 4, 5, 6, 7, 8, 9, 12, 13],
         exp_aln=(seq1, seq2),
     )
