@@ -57,9 +57,8 @@ def load_sequences(data: Any, moltype: str) -> SequenceCollection:
 
     """
 
-    if isinstance(data, str):
-        path = Path(data).expanduser().absolute()
-        data = load_unaligned_seqs(path, moltype=moltype)
+    if isinstance(data, str) or isinstance(data, Path):
+        data = load_unaligned_seqs(data, moltype=moltype)
     elif (isinstance(data, list) or isinstance(data, tuple)) and all(
         isinstance(elem, str) for elem in data
     ):
@@ -200,7 +199,6 @@ def to_DOT(nodes: List[Node]) -> graphviz.Digraph:  # pragma: no cover
         graphviz Digraph object representing the de Bruijn graph
 
     """
-    # FIXME: Fix the code below according too the change in the out_edges dictionary
     dot = graphviz.Digraph("de Bruijn graph")
     for node in nodes:
         dot.node(str(node.id), f"{str(node.id)}.{node.kmer}")
@@ -526,6 +524,7 @@ class deBruijn:
         self.avg_len = sum(map(len, self.sequences)) / self.num_seq
         self.add_debruijn()
         self.expansion = self.extract_bubble()
+        # automatically call fix function if the merge node contain cycle
         if not debruijn_merge_correctness(self.expansion):
             self.merge_node_idx = merge_indices_fix(self)
             self.expansion = self.extract_bubble()
@@ -720,16 +719,14 @@ class deBruijn:
         for seq_idx in range(self.num_seq):
             bubbles = []
             bubble = []
-            beginning = True
             for node_idx in self.seq_node_idx[seq_idx]:
                 # if self.nodes[node_idx].node_type not in {NodeType.start, NodeType.end}:
+                # Add empty lists to the expansion even if there's no bubble
                 if node_idx not in self.merge_node_idx:
                     bubble.append(node_idx)
                 else:
-                    if bubble or beginning:
-                        bubbles.append(bubble)
-                        bubble = []
-                        beginning = False
+                    bubbles.append(bubble)
+                    bubble = []
                     bubbles.append(node_idx)
             bubbles.append(bubble)
             expansion.append(bubbles)
@@ -828,9 +825,7 @@ class deBruijn:
     def get_merge_edge(
         self,
         seq1_curr_idx: int,
-        seq1_next_idx: int,
         seq2_curr_idx: int,
-        seq2_next_idx: int,
     ) -> Tuple[str, str]:
         """To get the duplicate_kmer from the edge that is from the merge node
 
@@ -838,12 +833,8 @@ class deBruijn:
         ----------
         seq1_curr_idx : int
             current node index of sequence1
-        seq1_next_idx : int
-            next node index of sequence1
         seq2_curr_idx : int
             current node index of sequence2
-        seq2_next_idx : int
-            next node index of sequence2
 
         Returns
         -------
@@ -957,9 +948,7 @@ def to_alignment(
             # extract the duplicate kmer on the merge node out edge
             merge_edge_read_seq1, merge_edge_read_seq2 = dbg.get_merge_edge(
                 seq1_curr_idx=dbg.seq_node_idx[0][seq1_idx],
-                seq1_next_idx=dbg.seq_node_idx[0][seq1_idx + 1],
                 seq2_curr_idx=dbg.seq_node_idx[1][seq2_idx],
-                seq2_next_idx=dbg.seq_node_idx[1][seq2_idx + 1],
             )
 
             seq1_res.extend([aln_seq1, dbg.read_from_kmer(merge_idx, 0)])
