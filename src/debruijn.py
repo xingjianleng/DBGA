@@ -387,8 +387,8 @@ class Edge:
             the node_id of the terminal node
         duplicate_str : str
             the edge can represent duplicate kmers. Defaults to ""
-        multiple_duplicate : str
-            FIXME:
+        multiple_duplicate : bool
+            indicate whether the duplicate_str contain multiple kmers
 
         Returns
         -------
@@ -455,7 +455,7 @@ class Node:
         duplicated_str : str
             the duplicated kmer represented by the edge. Defaults to ""
         multiple_duplicate : bool
-            FIXME:
+            indicate whether the duplicate_str contain multiple kmers
 
         Returns
         -------
@@ -588,7 +588,7 @@ class deBruijn:
         duplicated_str : str, Optional
             the duplicated kmer represented by the edge
         multiple_duplicate : bool, Optional
-            FIXME:
+            indicate whether the duplicate_str contain multiple kmers
 
 
         Returns

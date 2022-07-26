@@ -2,8 +2,10 @@ from collections import Counter
 from debruijn import deBruijn, load_sequences, get_kmers, NodeType, dna_global_aln
 from itertools import chain
 import math
-from typing import Tuple, List, Union
+from pathlib import Path
+from typing import Any, Tuple, List, Union
 
+import click
 from cogent3.align import make_dna_scoring_dict
 from cogent3.format.fasta import alignment_to_fasta
 
@@ -31,6 +33,20 @@ def calculate_k(seqs: Tuple[str, ...], thresh: int) -> int:
 
 
 def count_merge_node(seqs: Tuple[str, ...], k: int) -> int:
+    """estimate the number of merge nodes in the de Bruijn graph for the given kmer size
+
+    Parameters
+    ----------
+    seqs : Tuple[str, ...]
+        the input sequences
+    k : int
+        the given kmer size
+
+    Returns
+    -------
+    int
+        the estimated number of merge nodes
+    """
     kmers_seqs = []
     for seq in seqs:
         kmers_seqs.append(get_kmers(seq, k))
@@ -50,23 +66,50 @@ def count_merge_node(seqs: Tuple[str, ...], k: int) -> int:
     return total
 
 
-def dbg_alignment(
-    data,
+def adpt_dbg_alignment(
+    data: Any,
     thresh: int,
+    moltype: str,
     match: int = 10,
     transition: int = -1,
     transversion: int = -8,
     d: int = 10,
     e: int = 2,
 ) -> str:
+    """the function for adaptive de Bruijn alignment
+
+    Parameters
+    ----------
+    data : Any
+        the input sequences, could be list/tuple of str or file path
+    thresh : int
+        the maximum number of merge nodes allowed in the de Bruijn graph
+    moltype : str
+        the molecular type of the sequences
+    match : int, optional
+        score for two matching nucleotide, by default 10
+    transition : int, optional
+        cost for DNA transition mutation, by default -1
+    transversion : int, optional
+        cost for DNA transversion mutation, by default -8
+    d : int, optional
+        gap open costs, by default 10
+    e : int, optional
+        gap extend costs, by default 2
+
+    Returns
+    -------
+    str
+        the fasta representation of the alignment result
+    """
     # load the sequences
-    seqs_collection = load_sequences(data, moltype="dna")
+    seqs_collection = load_sequences(data, moltype=moltype)
 
     # scoring dict for aligning bubbles
     s = make_dna_scoring_dict(
         match=match, transition=transition, transversion=transversion
     )
-    aln = dbg_alignment_recursive(
+    aln = adpt_dbg_alignment_recursive(
         tuple([str(x) for x in seqs_collection.iter_seqs()]), thresh, s, d, e
     )
     return alignment_to_fasta(
@@ -74,9 +117,29 @@ def dbg_alignment(
     )
 
 
-def dbg_alignment_recursive(
+def adpt_dbg_alignment_recursive(
     seqs: Tuple[str, ...], thresh: int, s: dict, d: int, e: int
 ) -> Tuple[str, ...]:
+    """the recursive function for calling adaptive de Bruijn graph alignment
+
+    Parameters
+    ----------
+    seqs : Tuple[str, ...]
+        the input sequences
+    thresh : int
+        the maximum number of merge nodes allowed in the de Bruijn graph
+    s : dict
+        the DNA scoring dictionary
+    d : int
+        gap open costs
+    e : int
+        gap extend costs
+
+    Returns
+    -------
+    Tuple[str, ...]
+        the aligned sequences
+    """
     # Base case: If the sequences are short enough, call Cogent3 alignment
     min_len = min(map(len, seqs))
     if min_len < thresh:
@@ -121,7 +184,7 @@ def dbg_alignment_recursive(
                 bubble1, 0
             ), dbg.extract_bubble_seq(bubble2, 1)
 
-            bubble_aln = dbg_alignment_recursive(extracted_bubble, thresh, s, d, e)
+            bubble_aln = adpt_dbg_alignment_recursive(extracted_bubble, thresh, s, d, e)
             for seq_idx in range(2):
                 aln[seq_idx].append(bubble_aln[seq_idx])
         else:
@@ -165,17 +228,76 @@ def dbg_alignment_recursive(
             aln[0].append(bubble_read_seq1)
             aln[1].append(bubble_read_seq2)
 
-    # FIXME: The last set of bubbles should be added with the merge node in front of it
+    # The last set of bubbles should be added with the merge node in front of it
     # in case where the last merge node is the end of any sequences
-    # FIXME: Case where i = len(expansion1) - 2
     # Should contain [last merge node, last bubble]
     tail_bubble1 = [expansion1[len(expansion1) - 2]] + expansion1[len(expansion1) - 1]
     tail_bubble2 = [expansion2[len(expansion2) - 2]] + expansion2[len(expansion2) - 1]
     extracted_bubble: Tuple[str, str] = dbg.extract_bubble_seq(
         tail_bubble1, 0
     ), dbg.extract_bubble_seq(tail_bubble2, 1)
-    tail_bubble_aln = dbg_alignment_recursive(extracted_bubble, thresh, s, d, e)
+    tail_bubble_aln = adpt_dbg_alignment_recursive(extracted_bubble, thresh, s, d, e)
     for seq_idx in range(2):
         aln[seq_idx].append(tail_bubble_aln[seq_idx])
 
     return "".join(aln[0]), "".join(aln[1])
+
+
+@click.command()
+@click.option(
+    "--infile", type=str, required=True, help="input unaligned sequences file"
+)
+@click.option(
+    "--outfile", type=str, required=True, help="output aligned file destination"
+)
+@click.option(
+    "--thresh",
+    type=int,
+    required=True,
+    help="threshold for maximum number of merge nodes",
+)
+@click.option(
+    "--moltype",
+    default="dna",
+    type=str,
+    required=False,
+    help="molecular type of sequences",
+)
+@click.option(
+    "--match",
+    default=10,
+    type=int,
+    required=False,
+    help="score for two matching nucleotide",
+)
+@click.option(
+    "--transition",
+    default=-1,
+    type=int,
+    required=False,
+    help="cost for DNA transition mutation",
+)
+@click.option(
+    "--transversion",
+    default=-8,
+    type=int,
+    required=False,
+    help="cost for DNA transversion mutation",
+)
+@click.option(
+    "--d", default=10, type=int, required=False, help="costs for opening a gap"
+)
+@click.option(
+    "--e", default=2, type=int, required=False, help="costs for extending a gap"
+)
+def cli(infile, outfile, thresh, moltype, match, transition, transversion, d, e):
+    aln = adpt_dbg_alignment(
+        infile, thresh, moltype, match, transition, transversion, d, e
+    )
+    out_path = Path(outfile)
+    with open(f"{out_path.stem}_thresh{thresh}{out_path.suffix}", "w") as f:
+        f.write(aln)
+
+
+if __name__ == "__main__":
+    cli()
