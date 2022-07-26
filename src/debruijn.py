@@ -790,8 +790,8 @@ class deBruijn:
             edge_kmer = out_edge.duplicate_str
             if self.nodes[next_node_idx].node_type is NodeType.end:
                 if out_edge.multiple_duplicate:
-                    rtn.append(read_nucleotide_from_kmers(edge_kmer[:-2], self.k))
-                    rtn.append(edge_kmer[-2:])
+                    rtn.append(read_nucleotide_from_kmers(edge_kmer[: -self.k], self.k))
+                    rtn.append(edge_kmer[-self.k :])
                 else:
                     rtn.append(edge_kmer)
             else:
