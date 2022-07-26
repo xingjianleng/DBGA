@@ -62,7 +62,8 @@ def load_sequences(data: Any, moltype: str) -> SequenceCollection:
     elif (isinstance(data, list) or isinstance(data, tuple)) and all(
         isinstance(elem, str) for elem in data
     ):
-        data = make_unaligned_seqs(data, moltype=moltype)
+        dict_data = {index: seq for index, seq in enumerate(data)}
+        data = make_unaligned_seqs(dict_data, moltype=moltype)
     if isinstance(data, SequenceCollection):
         return data
     else:
@@ -301,7 +302,6 @@ def merge_indices_fix(
         window = max(20, round(db.avg_len / 25))
     else:
         window = max(40, round(db.avg_len / 600))
-    print(window, thresh, coef)
     filtered_indices = filter_outliers(
         indices_arr, shifts_arr, window=window, thresh=thresh, coef=coef
     )
@@ -374,7 +374,9 @@ class Edge:
 
     """
 
-    def __init__(self, out_node: int, in_node: int, duplicate_str: str = "") -> None:
+    def __init__(
+        self, out_node: int, in_node: int, duplicate_str: str, multiple_duplicate: bool
+    ) -> None:
         """Constructor for the Edge class
 
         Parameters
@@ -383,8 +385,10 @@ class Edge:
             the node_id of the starting node
         in_node : int
             the node_id of the terminal node
-        duplicate_str : str, optional
+        duplicate_str : str
             the edge can represent duplicate kmers. Defaults to ""
+        multiple_duplicate : str
+            FIXME:
 
         Returns
         -------
@@ -393,6 +397,7 @@ class Edge:
         self.out_node = out_node
         self.in_node = in_node
         self.duplicate_str = duplicate_str
+        self.multiple_duplicate = multiple_duplicate
         self.multiplicity = 1
 
 
@@ -437,7 +442,7 @@ class Node:
         self.count = 1
 
     def add_out_edge(
-        self, other_id: int, seq_idx: int, duplicate_str: str = ""
+        self, other_id: int, seq_idx: int, duplicate_str: str, multiple_duplicate: bool
     ) -> None:
         """Add the edge from this node to other node
 
@@ -447,8 +452,10 @@ class Node:
             the terminal node id of the edge
         seq_idx : int
             the sequence index of the current kmer connection
-        duplicated_str : str, optional
+        duplicated_str : str
             the duplicated kmer represented by the edge. Defaults to ""
+        multiple_duplicate : bool
+            FIXME:
 
         Returns
         -------
@@ -457,7 +464,7 @@ class Node:
         if seq_idx in self.out_edges:
             self.out_edges[seq_idx].multiplicity += 1
         else:
-            new_edge = Edge(self.id, seq_idx, duplicate_str=duplicate_str)
+            new_edge = Edge(self.id, seq_idx, duplicate_str, multiple_duplicate)
             self.out_edges[seq_idx] = new_edge
             self.next_nodes[other_id] = new_edge
 
@@ -561,7 +568,12 @@ class deBruijn:
         return self.id_count - 1
 
     def _add_edge(
-        self, out_id: int, in_id: int, seq_idx: int, duplicate_str: str = ""
+        self,
+        out_id: int,
+        in_id: int,
+        seq_idx: int,
+        duplicate_str: str = "",
+        multiple_duplicate: bool = False,
     ) -> None:
         """Connect two kmers in the de Bruijn graph with an edge
 
@@ -573,14 +585,19 @@ class deBruijn:
             the terminal node id
         seq_idx : int
             the sequence index of the current kmer connection
-        duplicated_str : str, optional
-            the duplicated kmer represented by the edge. Defaults to ""
+        duplicated_str : str, Optional
+            the duplicated kmer represented by the edge
+        multiple_duplicate : bool, Optional
+            FIXME:
+
 
         Returns
         -------
 
         """
-        self.nodes[out_id].add_out_edge(in_id, seq_idx, duplicate_str=duplicate_str)
+        self.nodes[out_id].add_out_edge(
+            in_id, seq_idx, duplicate_str, multiple_duplicate
+        )
 
     def _get_seq_kmer_indices(
         self, kmers: List[str], duplicate_kmer: Set[str], seq_idx: int
@@ -605,15 +622,24 @@ class deBruijn:
         # starting node
         prev_idx = self._add_node(kmer="", node_type=NodeType.start)
         node_indices = [prev_idx]
+        multiple_duplicate = False
         for kmer in kmers:
             if kmer in duplicate_kmer:
+                if edge_kmer:
+                    multiple_duplicate = True
                 edge_kmer.append(kmer)
                 current_idx = prev_idx
             elif len(edge_kmer) > 0:
                 # if there are duplicated kmers, store them in the edge
                 current_idx = self._add_node(kmer)
                 node_indices.append(current_idx)
-                self._add_edge(prev_idx, current_idx, seq_idx, "".join(edge_kmer))
+                self._add_edge(
+                    prev_idx,
+                    current_idx,
+                    seq_idx,
+                    "".join(edge_kmer),
+                    multiple_duplicate,
+                )
                 edge_kmer = []
             else:
                 # if there is no duplicated kmer, add new nodes
@@ -632,7 +658,9 @@ class deBruijn:
         # create the terminal node and connect with the previous node
         end_node = self._add_node(kmer="", node_type=NodeType.end)
         node_indices.append(end_node)
-        self._add_edge(current_idx, end_node, seq_idx, "".join(edge_kmer))
+        self._add_edge(
+            current_idx, end_node, seq_idx, "".join(edge_kmer), multiple_duplicate
+        )
         # return the sequence kmer indices
         return node_indices
 
@@ -758,9 +786,14 @@ class deBruijn:
             next_node_idx = bubble_idx_seq[i + 1]
             # if the next node is the end of sequence, read edge fully,
             # otherwise, read the first char
-            edge_kmer = self.nodes[node_idx].out_edges[seq_idx].duplicate_str
+            out_edge = self.nodes[node_idx].out_edges[seq_idx]
+            edge_kmer = out_edge.duplicate_str
             if self.nodes[next_node_idx].node_type is NodeType.end:
-                rtn.append(edge_kmer)
+                if out_edge.multiple_duplicate:
+                    rtn.append(read_nucleotide_from_kmers(edge_kmer[:-2], self.k))
+                    rtn.append(edge_kmer[-2:])
+                else:
+                    rtn.append(edge_kmer)
             else:
                 rtn.append(read_nucleotide_from_kmers(edge_kmer, self.k))
 
