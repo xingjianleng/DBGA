@@ -1,6 +1,4 @@
-from collections import Counter
-from debruijn import deBruijn, load_sequences, get_kmers, NodeType, dna_global_aln
-from itertools import chain
+from debruijn import deBruijn, load_sequences, NodeType, dna_global_aln, get_kmers
 import math
 from pathlib import Path
 from typing import Any, Tuple, List, Union
@@ -10,65 +8,30 @@ from cogent3.align import make_dna_scoring_dict
 from cogent3.format.fasta import alignment_to_fasta
 
 
-def calculate_k(seqs: Tuple[str, ...], thresh: int) -> int:
-    """the function for calculating an appropriate k for minimum number of merge nodes
-
-    Parameters
-    ----------
-    seqs : Tuple[str, ...]
-        the input collection of sequences
-    thresh : int
-        the threshold for the miminum number of merge nodes in the de Bruijn graph
-
-    Returns
-    -------
-    int
-        the suggested k for the de Bruijn graph
-    """
-
-    k = math.ceil(math.log(min(map(len, seqs)), 4))
-    while count_merge_node(seqs, k) > thresh or k > min(map(len, seqs)):
-        k += 1
-    return k
+# TODO: Add a function to determine the choices for kmer size
+k_choice = [x for x in range(31, 15, -2)]
 
 
-def count_merge_node(seqs: Tuple[str, ...], k: int) -> int:
-    """estimate the number of merge nodes in the de Bruijn graph for the given kmer size
+def predict_p(seqs, k):
+    # seqs is a SequenceCollection object
+    kmers_seq0_set = set(get_kmers(str(seqs.seqs[0]), k))
+    kmers_seq1_set = set(get_kmers(str(seqs.seqs[1]), k))
+    set_union = kmers_seq0_set | kmers_seq1_set
+    set_intersection = kmers_seq0_set & kmers_seq1_set
 
-    Parameters
-    ----------
-    seqs : Tuple[str, ...]
-        the input sequences
-    k : int
-        the given kmer size
+    p_prime = len(set_intersection) / len(set_union)
+    p = p_prime ** (1 / k)
+    return p
 
-    Returns
-    -------
-    int
-        the estimated number of merge nodes
-    """
-    kmers_seqs = []
-    for seq in seqs:
-        kmers_seqs.append(get_kmers(seq, k))
-    # inner-sequences duplicate counts
-    duplicates_kmer_set = set()
-    for kmers in kmers_seqs:
-        counter = Counter(kmers)
-        for kmer, count in counter.items():
-            if count > 1:
-                duplicates_kmer_set.add(kmer)
-    # inter-seuqneces duplicate counts
-    counter = Counter(chain(*kmers_seqs))
-    total = 0
-    for kmer, count in counter.items():
-        if count > 1 and kmer not in duplicates_kmer_set:
-            total += 1
-    return total
+
+def predict_final_p(seqs):
+    min_k = math.ceil(math.log(min(map(len, seqs.seqs)), 4))
+    max_k = math.ceil(math.log2(min(map(len, seqs.seqs)))) + 10
+    return min([p for p in (predict_p(seqs, k) for k in range(min_k, max_k))])
 
 
 def adpt_dbg_alignment(
     data: Any,
-    thresh: int,
     moltype: str,
     match: int = 10,
     transition: int = -1,
@@ -82,8 +45,6 @@ def adpt_dbg_alignment(
     ----------
     data : Any
         the input sequences, could be list/tuple of str or file path
-    thresh : int
-        the maximum number of merge nodes allowed in the de Bruijn graph
     moltype : str
         the molecular type of the sequences
     match : int, optional
@@ -109,16 +70,22 @@ def adpt_dbg_alignment(
     s = make_dna_scoring_dict(
         match=match, transition=transition, transversion=transversion
     )
-    aln = adpt_dbg_alignment_recursive(
-        tuple([str(x) for x in seqs_collection.iter_seqs()]), thresh, s, d, e
-    )
+
+    if predict_final_p(seqs_collection) < 0.8:
+        aln = dna_global_aln(
+            str(seqs_collection.seqs[0]), str(seqs_collection.seqs[1]), s, d, e
+        )
+    else:
+        aln = adpt_dbg_alignment_recursive(
+            tuple([str(x) for x in seqs_collection.iter_seqs()]), 0, s, d, e
+        )
     return alignment_to_fasta(
         {seqs_collection.names[0]: aln[0], seqs_collection.names[1]: aln[1]}
     )
 
 
 def adpt_dbg_alignment_recursive(
-    seqs: Tuple[str, ...], thresh: int, s: dict, d: int, e: int
+    seqs: Tuple[str, ...], k_index: int, s: dict, d: int, e: int
 ) -> Tuple[str, ...]:
     """the recursive function for calling adaptive de Bruijn graph alignment
 
@@ -126,8 +93,8 @@ def adpt_dbg_alignment_recursive(
     ----------
     seqs : Tuple[str, ...]
         the input sequences
-    thresh : int
-        the maximum number of merge nodes allowed in the de Bruijn graph
+    k_index : int
+        the index for chosen k in the k_choice list
     s : dict
         the DNA scoring dictionary
     d : int
@@ -140,24 +107,30 @@ def adpt_dbg_alignment_recursive(
     Tuple[str, ...]
         the aligned sequences
     """
-    # Base case: If the sequences are short enough, call Cogent3 alignment
-    min_len = min(map(len, seqs))
-    if min_len < thresh:
+
+    # FIXME: Two versions for adaptive de Bruijn alignment
+    # 1. Use brute-force, descend from large k to smaller k
+    # 2. Use mathematics and statistics ways to analyse the similarity between sequences to choose k
+    # print(k_index)
+    if k_index < 0 or k_index > len(k_choice) - 1:
         return dna_global_aln(*seqs, s, d, e)
 
-    # 1. The initial k should lead to limited number of merge nodes
-    k: int = calculate_k(seqs, thresh)
-    # When it's impossible to find the appropriate k, call cogent3 alignment
-    if k < 0 or k > min(map(len, seqs)):
+    k = k_choice[k_index]
+    # print(k_index)
+    # print(k)
+    # Base case: When it's impossible to find the appropriate k, call cogent3 alignment
+    if k <= 0 or k > min(map(len, seqs)):
         return dna_global_aln(*seqs, s, d, e)
 
     # 2. Construct de Bruijn graph with sequences and k
     dbg = deBruijn(seqs, k, moltype="dna")
+    # print(len(dbg.merge_node_idx))
+    # print("-----\n\n\n")
 
     # Edge case: when there's no merge node in the de Bruijn graph, directly align
     # when there's only merge node in the graph, it might lead to infinite loop, so directly align
     if len(dbg.merge_node_idx) < 2:
-        return dna_global_aln(*seqs, s, d, e)
+        return adpt_dbg_alignment_recursive(seqs, k_index + 1, s, d, e)
 
     # 3. Extract bubbles (original bubble sequences, not kmer strings)
     # if we consider sequence is consist of [bubble, merge ... bubble ... merge, bubble]
@@ -184,7 +157,9 @@ def adpt_dbg_alignment_recursive(
                 bubble1, 0
             ), dbg.extract_bubble_seq(bubble2, 1)
 
-            bubble_aln = adpt_dbg_alignment_recursive(extracted_bubble, thresh, s, d, e)
+            bubble_aln = adpt_dbg_alignment_recursive(
+                extracted_bubble, k_index + 1, s, d, e
+            )
             for seq_idx in range(2):
                 aln[seq_idx].append(bubble_aln[seq_idx])
         else:
@@ -236,7 +211,9 @@ def adpt_dbg_alignment_recursive(
     extracted_bubble: Tuple[str, str] = dbg.extract_bubble_seq(
         tail_bubble1, 0
     ), dbg.extract_bubble_seq(tail_bubble2, 1)
-    tail_bubble_aln = adpt_dbg_alignment_recursive(extracted_bubble, thresh, s, d, e)
+    tail_bubble_aln = adpt_dbg_alignment_recursive(
+        extracted_bubble, k_index + 1, s, d, e
+    )
     for seq_idx in range(2):
         aln[seq_idx].append(tail_bubble_aln[seq_idx])
 
@@ -249,12 +226,6 @@ def adpt_dbg_alignment_recursive(
 )
 @click.option(
     "--outfile", type=str, required=True, help="output aligned file destination"
-)
-@click.option(
-    "--thresh",
-    type=int,
-    required=True,
-    help="threshold for maximum number of merge nodes",
 )
 @click.option(
     "--moltype",
@@ -290,12 +261,10 @@ def adpt_dbg_alignment_recursive(
 @click.option(
     "--e", default=2, type=int, required=False, help="costs for extending a gap"
 )
-def cli(infile, outfile, thresh, moltype, match, transition, transversion, d, e):
-    aln = adpt_dbg_alignment(
-        infile, thresh, moltype, match, transition, transversion, d, e
-    )
+def cli(infile, outfile, moltype, match, transition, transversion, d, e):
+    aln = adpt_dbg_alignment(infile, moltype, match, transition, transversion, d, e)
     out_path = Path(outfile)
-    with open(f"{out_path.stem}_thresh{thresh}{out_path.suffix}", "w") as f:
+    with open(f"{out_path.stem}{out_path.suffix}", "w") as f:
         f.write(aln)
 
 
