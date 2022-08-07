@@ -8,8 +8,13 @@ from cogent3.align import make_dna_scoring_dict
 from cogent3.format.fasta import alignment_to_fasta
 
 
-# TODO: Add a function to determine the choices for kmer size
-k_choice = [x for x in range(31, 15, -2)]
+def get_closest_odd(num: int, upper: bool):
+    if upper and num & 1 == 0:
+        return num + 1
+    elif not upper and num & 1 == 0:
+        return num - 1
+    else:
+        return num
 
 
 def predict_p(seqs, k):
@@ -66,18 +71,30 @@ def adpt_dbg_alignment(
     # load the sequences
     seqs_collection = load_sequences(data, moltype=moltype)
 
+    # heuristic prediction/estimation
+    min_k = max(13, math.ceil(math.log(min(map(len, seqs_collection.seqs)), 4)))
+    max_k = math.ceil(math.log2(min(map(len, seqs_collection.seqs)))) + 10
+    k_choice = tuple(
+        [
+            x
+            for x in range(
+                get_closest_odd(max_k, True), get_closest_odd(min_k, False) - 1, -2
+            )
+        ]
+    )
+
     # scoring dict for aligning bubbles
     s = make_dna_scoring_dict(
         match=match, transition=transition, transversion=transversion
     )
 
-    if predict_final_p(seqs_collection) < 0.8:
+    if predict_final_p(seqs_collection) < 0.80:
         aln = dna_global_aln(
             str(seqs_collection.seqs[0]), str(seqs_collection.seqs[1]), s, d, e
         )
     else:
         aln = adpt_dbg_alignment_recursive(
-            tuple([str(x) for x in seqs_collection.iter_seqs()]), 0, s, d, e
+            tuple([str(x) for x in seqs_collection.iter_seqs()]), 0, k_choice, s, d, e
         )
     return alignment_to_fasta(
         {seqs_collection.names[0]: aln[0], seqs_collection.names[1]: aln[1]}
@@ -85,7 +102,12 @@ def adpt_dbg_alignment(
 
 
 def adpt_dbg_alignment_recursive(
-    seqs: Tuple[str, ...], k_index: int, s: dict, d: int, e: int
+    seqs: Tuple[str, ...],
+    k_index: int,
+    k_choice: Tuple[int, ...],
+    s: dict,
+    d: int,
+    e: int,
 ) -> Tuple[str, ...]:
     """the recursive function for calling adaptive de Bruijn graph alignment
 
@@ -95,6 +117,8 @@ def adpt_dbg_alignment_recursive(
         the input sequences
     k_index : int
         the index for chosen k in the k_choice list
+    k_choice : Tuple[int, ...]
+        the possible choices for kmer size
     s : dict
         the DNA scoring dictionary
     d : int
@@ -111,26 +135,26 @@ def adpt_dbg_alignment_recursive(
     # FIXME: Two versions for adaptive de Bruijn alignment
     # 1. Use brute-force, descend from large k to smaller k
     # 2. Use mathematics and statistics ways to analyse the similarity between sequences to choose k
-    # print(k_index)
+    print(k_index, k_choice)
     if k_index < 0 or k_index > len(k_choice) - 1:
         return dna_global_aln(*seqs, s, d, e)
 
     k = k_choice[k_index]
-    # print(k_index)
-    # print(k)
+    print(k_index)
+    print(k)
     # Base case: When it's impossible to find the appropriate k, call cogent3 alignment
     if k <= 0 or k > min(map(len, seqs)):
         return dna_global_aln(*seqs, s, d, e)
 
     # 2. Construct de Bruijn graph with sequences and k
     dbg = deBruijn(seqs, k, moltype="dna")
-    # print(len(dbg.merge_node_idx))
-    # print("-----\n\n\n")
+    print(len(dbg.merge_node_idx))
+    print("-----\n\n\n")
 
     # Edge case: when there's no merge node in the de Bruijn graph, directly align
     # when there's only merge node in the graph, it might lead to infinite loop, so directly align
     if len(dbg.merge_node_idx) < 2:
-        return adpt_dbg_alignment_recursive(seqs, k_index + 1, s, d, e)
+        return adpt_dbg_alignment_recursive(seqs, k_index + 1, k_choice, s, d, e)
 
     # 3. Extract bubbles (original bubble sequences, not kmer strings)
     # if we consider sequence is consist of [bubble, merge ... bubble ... merge, bubble]
@@ -158,7 +182,7 @@ def adpt_dbg_alignment_recursive(
             ), dbg.extract_bubble_seq(bubble2, 1)
 
             bubble_aln = adpt_dbg_alignment_recursive(
-                extracted_bubble, k_index + 1, s, d, e
+                extracted_bubble, k_index + 1, k_choice, s, d, e
             )
             for seq_idx in range(2):
                 aln[seq_idx].append(bubble_aln[seq_idx])
@@ -212,7 +236,7 @@ def adpt_dbg_alignment_recursive(
         tail_bubble1, 0
     ), dbg.extract_bubble_seq(tail_bubble2, 1)
     tail_bubble_aln = adpt_dbg_alignment_recursive(
-        extracted_bubble, k_index + 1, s, d, e
+        extracted_bubble, k_index + 1, k_choice, s, d, e
     )
     for seq_idx in range(2):
         aln[seq_idx].append(tail_bubble_aln[seq_idx])
