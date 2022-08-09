@@ -5,7 +5,9 @@ from typing import Any, Tuple, List, Union
 
 import click
 from cogent3.align import make_dna_scoring_dict
+from cogent3.core.sequence import DnaSequence
 from cogent3.format.fasta import alignment_to_fasta
+from cogent3.maths.stats.number import CategoryCounter
 
 
 def get_closest_odd(num: int, upper: bool):
@@ -15,6 +17,14 @@ def get_closest_odd(num: int, upper: bool):
         return num - 1
     else:
         return num
+
+
+def get_seqs_entropy(seqs_collection):
+    seqs = [str(seq) for seq in seqs_collection.iter_seqs()]
+    seqs = DnaSequence("".join(seqs))
+    suggested_k = math.ceil(math.log(len(seqs), 4))
+    counts = CategoryCounter(seqs.iter_kmers(k=suggested_k))
+    return counts.entropy
 
 
 def predict_p(seqs, k):
@@ -76,8 +86,8 @@ def adpt_dbg_alignment(
     max_k = math.ceil(math.log2(min(map(len, seqs_collection.seqs)))) + 10
     k_choice = tuple(
         [
-            x
-            for x in range(
+            choice
+            for choice in range(
                 get_closest_odd(max_k, True), get_closest_odd(min_k, False) - 1, -2
             )
         ]
@@ -88,13 +98,21 @@ def adpt_dbg_alignment(
         match=match, transition=transition, transversion=transversion
     )
 
-    if predict_final_p(seqs_collection) < 0.80:
+    if (
+        predict_final_p(seqs_collection) < 0.80
+        or get_seqs_entropy(seqs_collection) < 11
+    ):
         aln = dna_global_aln(
             str(seqs_collection.seqs[0]), str(seqs_collection.seqs[1]), s, d, e
         )
     else:
         aln = adpt_dbg_alignment_recursive(
-            tuple([str(x) for x in seqs_collection.iter_seqs()]), 0, k_choice, s, d, e
+            tuple([str(seq) for seq in seqs_collection.iter_seqs()]),
+            0,
+            k_choice,
+            s,
+            d,
+            e,
         )
     return alignment_to_fasta(
         {seqs_collection.names[0]: aln[0], seqs_collection.names[1]: aln[1]}
@@ -135,21 +153,21 @@ def adpt_dbg_alignment_recursive(
     # FIXME: Two versions for adaptive de Bruijn alignment
     # 1. Use brute-force, descend from large k to smaller k
     # 2. Use mathematics and statistics ways to analyse the similarity between sequences to choose k
-    print(k_index, k_choice)
+    # print(k_index, k_choice)
     if k_index < 0 or k_index > len(k_choice) - 1:
         return dna_global_aln(*seqs, s, d, e)
 
     k = k_choice[k_index]
-    print(k_index)
-    print(k)
+    # print(k_index)
+    # print(k)
     # Base case: When it's impossible to find the appropriate k, call cogent3 alignment
     if k <= 0 or k > min(map(len, seqs)):
         return dna_global_aln(*seqs, s, d, e)
 
     # 2. Construct de Bruijn graph with sequences and k
     dbg = deBruijn(seqs, k, moltype="dna")
-    print(len(dbg.merge_node_idx))
-    print("-----\n\n\n")
+    # print(len(dbg.merge_node_idx))
+    # print("-----\n\n\n")
 
     # Edge case: when there's no merge node in the de Bruijn graph, directly align
     # when there's only merge node in the graph, it might lead to infinite loop, so directly align
