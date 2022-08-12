@@ -4,7 +4,7 @@ from cogent3.core.alphabet import AlphabetError
 from cogent3 import SequenceCollection
 import pytest
 
-from src.debruijn import *
+from src.debruijn_pairwise import *
 
 
 def sequence_loader_checker(seqs, exp_seq1: str, exp_seq2: str):

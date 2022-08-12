@@ -1,4 +1,10 @@
-from debruijn import deBruijn, load_sequences, NodeType, dna_global_aln, get_kmers
+from debruijn_pairwise import (
+    deBruijn,
+    load_sequences,
+    NodeType,
+    dna_global_aln,
+    get_kmers,
+)
 import math
 from pathlib import Path
 from typing import Any, Tuple, List, Union

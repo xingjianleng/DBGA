@@ -1,5 +1,5 @@
 from adaptive_debruijn import adpt_dbg_alignment
-from debruijn import deBruijn, to_alignment
+from debruijn_pairwise import deBruijn, to_alignment
 from pathlib import Path
 
 
