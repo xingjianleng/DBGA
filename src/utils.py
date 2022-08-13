@@ -26,13 +26,16 @@ def list_intersection(list1: List[Any], list2: List[Any]) -> List[Any]:
         the intersection of two input lists
     """
     rtn = []
+    # for merge nodes, sort the list
+    lst1_sorted = sorted(list1)
+    lst2_sorted = sorted(list2)
     ptr1, ptr2 = 0, 0
-    while ptr1 < len(list1) and ptr2 < len(list2):
-        if list1[ptr1] == list2[ptr2]:
-            rtn.append(list1[ptr1])
+    while ptr1 < len(lst1_sorted) and ptr2 < len(lst2_sorted):
+        if lst1_sorted[ptr1] == lst2_sorted[ptr2]:
+            rtn.append(lst1_sorted[ptr1])
             ptr1 += 1
             ptr2 += 1
-        elif list1[ptr1] < list2[ptr2]:
+        elif lst1_sorted[ptr1] < lst2_sorted[ptr2]:
             ptr1 += 1
         else:
             ptr2 += 1

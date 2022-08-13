@@ -417,12 +417,12 @@ class deBruijn:
         return kmer if node_idx == self.seq_last_kmer_idx[seq_idx] else kmer[0]
 
     def extract_bubble(self) -> List[List[Union[int, List[int]]]]:
-        """Extract indicies of bubbles and merge nodes of sequences in the de Bruijn graph
+        """Extract indices of bubbles and merge nodes of sequences in the de Bruijn graph
 
         Returns
         -------
         List[List[Union[int, List[int]]]]
-            List of indicies of bubbles and merge nodes of sequences in the de Bruijn graph
+            List of indices of bubbles and merge nodes of sequences in the de Bruijn graph
         """
         expansion = []
         for seq_idx in range(self.num_seq):
@@ -457,7 +457,7 @@ class deBruijn:
             the string from the bubble with indices of nodes
 
         """
-        # the last index will always representing the merge node or the end node (last bubble)
+        # NOTE: the last index will always representing the merge node or the end node (last bubble)
         assert seq_idx in {0, 1}
         rtn = []
         for i in range(len(bubble_idx_seq) - 1):
@@ -570,6 +570,8 @@ def to_alignment(
 
     Parameters
     ----------
+    dbg : deBruijnMultiSeqs
+        deBruijn object containing all sequences
     match : int
         score for two matching nucleotide
     transition : int

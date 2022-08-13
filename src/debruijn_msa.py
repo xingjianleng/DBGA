@@ -71,6 +71,11 @@ class deBruijnMultiSeqs:
         self.avg_len = sum(map(len, self.sequences)) / self.num_seq
         self.add_debruijn()
         self.expansion = self.extract_bubble()
+        # detect cycles in de Bruijn graph
+        if not debruijn_merge_correctness(self.expansion):
+            raise ValueError(
+                "Cycles detected in de Bruijn graph, usually caused by small kmer sizes"
+            )
 
     def _add_node(self, kmer: str = "", node_type: NodeType = NodeType.middle) -> int:
         """Add a single node to the de Bruijn graph
@@ -280,14 +285,13 @@ class deBruijnMultiSeqs:
         return kmer if node_idx == self.seq_last_kmer_idx[seq_idx] else kmer[0]
 
     def extract_bubble(self) -> List[List[Union[int, List[int]]]]:
-        """Extract indicies of bubbles and merge nodes of sequences in the de Bruijn graph
+        """Extract indices of bubbles and merge nodes of sequences in the de Bruijn graph
 
         Returns
         -------
         List[List[Union[int, List[int]]]]
-            List of indicies of bubbles and merge nodes of sequences in the de Bruijn graph
+            List of indices of bubbles and merge nodes of sequences in the de Bruijn graph
         """
-        # FIXME: Need a new method for extract bubble. Future MSA alignment is based on this method
         expansion = []
         for seq_idx in range(self.num_seq):
             bubbles = []
@@ -321,7 +325,7 @@ class deBruijnMultiSeqs:
             the string from the bubble with indices of nodes
 
         """
-        # the last index will always representing the merge node or the end node (last bubble)
+        # NOTE: the last index will always representing the merge node or the end node (last bubble)
         assert seq_idx in range(self.num_seq)
         rtn = []
         for i in range(len(bubble_idx_seq) - 1):
@@ -370,3 +374,37 @@ class deBruijnMultiSeqs:
         ]
         # no chance that next node is End NodeType, we won't call this function for the last merge node
         return seqs_edge_kmer
+
+
+def msa_alignment(
+    dbg: deBruijnMultiSeqs,
+    match: int = 10,
+    transition: int = -1,
+    transversion: int = -8,
+    d: int = 10,
+    e: int = 2,
+) -> str:
+    """Use de Bruijn graph to align multiple sequences
+
+    Parameters
+    ----------
+    dbg : deBruijnMultiSeqs
+        deBruijn object containing all sequences
+    match : int
+        score for two matching nucleotide
+    transition : int
+        cost for DNA transition mutation
+    transversion : int
+        cost for DNA transversion mutation
+    d : int
+        gap open costs. Defaults to 10
+    e : int
+        gap extend costs. Defaults to 2
+
+    Returns
+    -------
+    str
+        the fasta representation of the alignment result
+
+    """
+    pass
