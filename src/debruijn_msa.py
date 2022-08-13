@@ -322,6 +322,7 @@ class deBruijnMultiSeqs:
 
         """
         # the last index will always representing the merge node or the end node (last bubble)
+        assert seq_idx in range(self.num_seq)
         rtn = []
         for i in range(len(bubble_idx_seq) - 1):
             node_idx = bubble_idx_seq[i]
@@ -347,81 +348,25 @@ class deBruijnMultiSeqs:
         #     rtn.append(self.read_from_kmer(last_node_idx, seq_idx=seq_idx))
         return "".join(rtn)
 
-    def bubble_aln(
-        self,
-        bubble_indices_seq1: List[int],
-        bubble_indices_seq2: List[int],
-        s: Dict[Tuple[str, str], int],
-        d: int,
-        e: int,
-        prev_edge_read1: str = "",
-        prev_edge_read2: str = "",
-        prev_merge: str = "",
-    ) -> Tuple[str, str]:
-        """Align the bubbles in the de Bruijn graph
-
-        Parameters
-        ----------
-        bubble_idx_seq1 : List[int]
-            the list containing indices of nodes of seq1 in the bubble
-        bubble_idx_seq2 : List[int]
-            the list containing indices of nodes of seq2 in the bubble
-        s : Dict[Tuple[str, str], int]
-            the DNA scoring matrix
-        d : int
-            gap open costs
-        e : int
-            gap extend costs
-        prev_edge_read1 : str, optional
-            the edge kmer from the edge of the last merge node for seq1. Defaults to "".
-        prev_edge_read2 : str, optional
-            the edge kmer from the edge of the last merge node for seq2. Defaults to "".
-        prev_merge : str, optional
-            the previous merge node nucleotide. Defaults to "".
-
-        Returns
-        -------
-        Tuple[str, str]
-            the aligned sequences from the bubble in the de Bruijn graph
-
-        """
-        # short cut for faster experiments
-        if (
-            len(bubble_indices_seq1) == len(bubble_indices_seq2) == 1
-            and prev_edge_read1 == prev_edge_read2 == ""
-        ):
-            return prev_merge, prev_merge
-
-        # extract original bubble sequences
-        bubble_seq1_str = f"{prev_merge}{prev_edge_read1}{self.extract_bubble_seq(bubble_indices_seq1, 0)}"
-        bubble_seq2_str = f"{prev_merge}{prev_edge_read2}{self.extract_bubble_seq(bubble_indices_seq2, 1)}"
-
-        # call the global_aln function to compute the global alignment of two sequences
-        return dna_global_aln(bubble_seq1_str, bubble_seq2_str, s=s, d=d, e=e)
-
-    def get_merge_edge(
-        self,
-        seq1_curr_idx: int,
-        seq2_curr_idx: int,
-    ) -> Tuple[str, str]:
+    def get_merge_edge(self, merge_node_idx: int) -> List[str]:
         """To get the duplicate_kmer from the edge that is from the merge node
 
         Parameters
         ----------
-        seq1_curr_idx : int
-            current node index of sequence1
-        seq2_curr_idx : int
-            current node index of sequence2
+        merge_node_idx : int
+            index of the current merge node
 
         Returns
         -------
-        Tuple[str, str]
+        List[str]
             the duplicate_kmer string for each sequence that is from the merge node
 
         """
-        seq1_edge_kmer = self.nodes[seq1_curr_idx].out_edges[0].duplicate_str
-        seq2_edge_kmer = self.nodes[seq2_curr_idx].out_edges[1].duplicate_str
+        seqs_edge_kmer = [
+            read_nucleotide_from_kmers(
+                self.nodes[merge_node_idx].out_edges[i].duplicate_str, self.k
+            )
+            for i in range(self.num_seq)
+        ]
         # no chance that next node is End NodeType, we won't call this function for the last merge node
-        merge_edge_read_seq1 = read_nucleotide_from_kmers(seq1_edge_kmer, self.k)
-        merge_edge_read_seq2 = read_nucleotide_from_kmers(seq2_edge_kmer, self.k)
-        return merge_edge_read_seq1, merge_edge_read_seq2
+        return seqs_edge_kmer

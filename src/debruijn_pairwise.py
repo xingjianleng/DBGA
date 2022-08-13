@@ -536,19 +536,13 @@ class deBruijn:
         # call the global_aln function to compute the global alignment of two sequences
         return dna_global_aln(bubble_seq1_str, bubble_seq2_str, s=s, d=d, e=e)
 
-    def get_merge_edge(
-        self,
-        seq1_curr_idx: int,
-        seq2_curr_idx: int,
-    ) -> Tuple[str, str]:
+    def get_merge_edge(self, merge_node_idx: int) -> Tuple[str, str]:
         """To get the duplicate_kmer from the edge that is from the merge node
 
         Parameters
         ----------
-        seq1_curr_idx : int
-            current node index of sequence1
-        seq2_curr_idx : int
-            current node index of sequence2
+        merge_node_idx : int
+            index of the current merge node
 
         Returns
         -------
@@ -556,8 +550,8 @@ class deBruijn:
             the duplicate_kmer string for each sequence that is from the merge node
 
         """
-        seq1_edge_kmer = self.nodes[seq1_curr_idx].out_edges[0].duplicate_str
-        seq2_edge_kmer = self.nodes[seq2_curr_idx].out_edges[1].duplicate_str
+        seq1_edge_kmer = self.nodes[merge_node_idx].out_edges[0].duplicate_str
+        seq2_edge_kmer = self.nodes[merge_node_idx].out_edges[1].duplicate_str
         # no chance that next node is End NodeType, we won't call this function for the last merge node
         merge_edge_read_seq1 = read_nucleotide_from_kmers(seq1_edge_kmer, self.k)
         merge_edge_read_seq2 = read_nucleotide_from_kmers(seq2_edge_kmer, self.k)
@@ -661,8 +655,7 @@ def to_alignment(
         if i != len(dbg.merge_node_idx) - 1:
             # extract the duplicate kmer on the merge node out edge
             merge_edge_read_seq1, merge_edge_read_seq2 = dbg.get_merge_edge(
-                seq1_curr_idx=dbg.seq_node_idx[0][seq1_idx],
-                seq2_curr_idx=dbg.seq_node_idx[1][seq2_idx],
+                merge_node_idx=dbg.seq_node_idx[0][seq1_idx],
             )
 
             seq1_res.extend([aln_seq1, dbg.read_from_kmer(merge_idx, 0)])
