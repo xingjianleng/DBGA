@@ -11,7 +11,7 @@ import graphviz
 
 
 def list_intersection(list1: List[Any], list2: List[Any]) -> List[Any]:
-    """calculate the intersection of two lists with runtime O(n)
+    """calculate the intersection of two lists with runtime O(nlogn)
 
     Parameters
     ----------

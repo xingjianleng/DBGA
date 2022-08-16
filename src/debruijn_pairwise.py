@@ -7,147 +7,6 @@ import click
 from cogent3.align import make_dna_scoring_dict
 from cogent3.format.fasta import alignment_to_fasta
 from cogent3 import SequenceCollection
-import numpy as np
-import plotly.express as px
-
-
-def chebyshev(arr: np.ndarray, coef: float) -> np.ndarray:  # pragma: no cover
-    """Use Chebyshev to calculate outliers
-
-    Parameters
-    ----------
-    arr : np.ndarray
-        the array of data points
-    coef : float
-        the coefficient for how many standard deviations to be considered as an outlier
-
-    Returns
-    -------
-    np.ndarray
-        the ndarray of booleans indicating whether the element is an outlier
-    """
-    mean = np.mean(arr)
-    std = np.std(arr, ddof=1)
-    cheb = coef * std
-    outliers = np.logical_or(arr < (mean - cheb), arr > (mean + cheb))
-    assert outliers.shape == arr.shape
-    return outliers
-
-
-def filter_outliers(
-    indices: np.ndarray, arr: np.ndarray, window: int, thresh: float, coef: float
-) -> np.ndarray:  # pragma: no cover
-    """Filter outliers in a given array
-
-    Parameters
-    ----------
-    indices : np.ndarray
-        the indices of each array element
-    arr : np.ndarray
-        the array elements
-    window : int
-        the window size for local Chebyshev algorithm
-    thresh : float
-        the threshold for a data point to be considered as an outlier
-    coef : float
-        the coefficient for how many standard deviations to be considered as an outlier
-
-    Returns
-    -------
-    np.ndarray
-        the list of indices after filtering
-
-    """
-    # use local Chebyshev to filter remaining outliers
-    assert indices.shape == arr.shape
-    window_num = indices.size - window + 1
-    outlier_count = np.zeros_like(indices)
-    for i in range(window_num):
-        outlier_count[i : i + window] += chebyshev(arr[i : i + window], coef)
-
-    inliers = outlier_count <= window * thresh
-    return indices[inliers]
-
-
-def merge_indices_fix(
-    db: deBruijn, thresh: float = 0.1
-) -> List[int]:  # pragma: no cover
-    """Fix function when cycle in merge node indices list can be observed
-
-    Parameters
-    ----------
-    db : deBruijn
-        a deBruijn graph object of two sequences
-    thresh : float, optional
-        the threshold for a data point to be considered as an outlier. Defaults to 0.1
-
-    Returns
-    -------
-    List[int]
-        the fixed merge node indices list
-
-    """
-    merge_shifts = mapping_shifts(db)
-    indices_arr = np.array(merge_shifts["node_indices"])
-    shifts_arr = np.array(merge_shifts["shifts"])
-    coef = min(
-        3, max(0.3, (db.avg_len + 4.4) / 18)
-    )  # heuristic to calculate coefficient
-    if db.avg_len <= 300:  # heuristic to calculate window size
-        window = max(5, round(db.avg_len / 15))
-    elif db.avg_len <= 1000:
-        window = max(20, round(db.avg_len / 25))
-    else:
-        window = max(40, round(db.avg_len / 600))
-    filtered_indices = filter_outliers(
-        indices_arr, shifts_arr, window=window, thresh=thresh, coef=coef
-    )
-    return filtered_indices.tolist()
-
-
-def mapping_shifts(db: deBruijn, visualize: bool = False) -> Dict[str, List[int]]:
-    """The function to plot the shifting of indices of matched kmers
-
-    Parameters
-    ----------
-    db : deBruijn
-        a deBruijn graph object of two sequences
-    visualize : bool, optional
-        whether show the visualization of the shifts plot. Defaults to False
-
-    Returns
-    -------
-    Dict[List[int], List[int]]
-        the dictionary containing merge_node_indices and the shift values
-
-    """
-    # db should be in type deBruijn
-    assert isinstance(db, deBruijn)
-
-    sorted_merge: List[int] = sorted(db.merge_node_idx)
-
-    # TODO: Need a more efficient way to calculate/memorize the indices
-    shifts = [
-        db.seq_node_idx[1].index(merge_idx) - db.seq_node_idx[0].index(merge_idx)
-        for merge_idx in sorted_merge
-    ]
-
-    merge_shifts = {
-        "node_indices": sorted_merge,
-        "shifts": shifts,
-    }
-
-    if visualize:  # pragma: no cover
-        figure = px.line(
-            merge_shifts,
-            x="node_indices",
-            y="shifts",
-            title="Matching shifts over merge node indices based on sequence 1",
-            markers=True,
-        )
-        figure.show()
-
-    return merge_shifts
 
 
 class deBruijn:
@@ -214,8 +73,9 @@ class deBruijn:
         self.expansion = self.extract_bubble()
         # automatically call fix function if the merge node contain cycle
         if not debruijn_merge_correctness(self.expansion):
-            self.merge_node_idx = merge_indices_fix(self)
-            self.expansion = self.extract_bubble()
+            raise ValueError(
+                "Cycles detected in de Bruijn graph, usually caused by small kmer sizes"
+            )
 
     def _add_node(self, kmer: str = "", node_type: NodeType = NodeType.middle) -> int:
         """Add a single node to the de Bruijn graph
@@ -557,144 +417,133 @@ class deBruijn:
         merge_edge_read_seq2 = read_nucleotide_from_kmers(seq2_edge_kmer, self.k)
         return merge_edge_read_seq1, merge_edge_read_seq2
 
+    def alignment(
+        self,
+        match: int = 10,
+        transition: int = -1,
+        transversion: int = -8,
+        d: int = 10,
+        e: int = 2,
+    ) -> str:
+        """Use de Bruijn graph to align two sequences
 
-def to_alignment(
-    dbg: deBruijn,
-    match: int = 10,
-    transition: int = -1,
-    transversion: int = -8,
-    d: int = 10,
-    e: int = 2,
-) -> str:
-    """Use de Bruijn graph to align two sequences
+        Parameters
+        ----------
+        match : int
+            score for two matching nucleotide
+        transition : int
+            cost for DNA transition mutation
+        transversion : int
+            cost for DNA transversion mutation
+        d : int
+            gap open costs. Defaults to 10
+        e : int
+            gap extend costs. Defaults to 2
 
-    Parameters
-    ----------
-    dbg : deBruijnMultiSeqs
-        deBruijn object containing all sequences
-    match : int
-        score for two matching nucleotide
-    transition : int
-        cost for DNA transition mutation
-    transversion : int
-        cost for DNA transversion mutation
-    d : int
-        gap open costs. Defaults to 10
-    e : int
-        gap extend costs. Defaults to 2
+        Returns
+        -------
+        str
+            the fasta representation of the alignment result
 
-    Returns
-    -------
-    str
-        the fasta representation of the alignment result
-
-    """
-    # scoring dict for aligning bubbles
-    s = make_dna_scoring_dict(
-        match=match, transition=transition, transversion=transversion
-    )
-
-    # if there's no merge node, apply global alignment
-    if not dbg.merge_node_idx:
-        alignment = dna_global_aln(
-            str(dbg.sequences[0]), str(dbg.sequences[1]), s=s, d=d, e=e
-        )
-        return alignment_to_fasta(
-            {dbg.names[0]: alignment[0], dbg.names[1]: alignment[1]}
+        """
+        # scoring dict for aligning bubbles
+        s = make_dna_scoring_dict(
+            match=match, transition=transition, transversion=transversion
         )
 
-    seq1_idx, seq2_idx = 0, 0
-    seq1_res, seq2_res = [], []
-    merge_edge_read_seq1, merge_edge_read_seq2 = "", ""
+        # if there's no merge node, apply global alignment
+        if not self.merge_node_idx:
+            alignment = dna_global_aln(
+                str(self.sequences[0]), str(self.sequences[1]), s=s, d=d, e=e
+            )
+            return alignment_to_fasta(
+                {self.names[0]: alignment[0], self.names[1]: alignment[1]}
+            )
 
-    for i, merge_idx in enumerate(dbg.merge_node_idx):
-        bubble_idx_seq1, bubble_idx_seq2 = [], []
-        while (
-            seq1_idx < len(dbg.seq_node_idx[0])
-            and dbg.seq_node_idx[0][seq1_idx] != merge_idx
-        ):
-            bubble_idx_seq1.append(dbg.seq_node_idx[0][seq1_idx])
+        seq1_idx, seq2_idx = 0, 0
+        seq1_res, seq2_res = [], []
+        merge_edge_read_seq1, merge_edge_read_seq2 = "", ""
+
+        for i, merge_idx in enumerate(self.merge_node_idx):
+            bubble_idx_seq1, bubble_idx_seq2 = [], []
+            while (
+                seq1_idx < len(self.seq_node_idx[0])
+                and self.seq_node_idx[0][seq1_idx] != merge_idx
+            ):
+                bubble_idx_seq1.append(self.seq_node_idx[0][seq1_idx])
+                seq1_idx += 1
+
+            while (
+                seq2_idx < len(self.seq_node_idx[1])
+                and self.seq_node_idx[1][seq2_idx] != merge_idx
+            ):
+                bubble_idx_seq2.append(self.seq_node_idx[1][seq2_idx])
+                seq2_idx += 1
+
+            # add the merge node index to the list
+            bubble_idx_seq1.append(merge_idx)
+            bubble_idx_seq2.append(merge_idx)
+
+            prev_merge: str = (
+                self.read_from_kmer(self.merge_node_idx[i - 1], 0) if i > 0 else ""
+            )
+
+            # get alignment of the bubble (with previous merge node nucleotide)
+            bubble_alignment = self.bubble_aln(
+                bubble_indices_seq1=bubble_idx_seq1,
+                bubble_indices_seq2=bubble_idx_seq2,
+                s=s,
+                d=d,
+                e=e,
+                prev_edge_read1=merge_edge_read_seq1,
+                prev_edge_read2=merge_edge_read_seq2,
+                prev_merge=prev_merge,
+            )
+
+            aln_seq1 = bubble_alignment[0][1:] if i > 0 else bubble_alignment[0]
+            aln_seq2 = bubble_alignment[1][1:] if i > 0 else bubble_alignment[1]
+
+            if i != len(self.merge_node_idx) - 1:
+                # extract the duplicate kmer on the merge node out edge
+                merge_edge_read_seq1, merge_edge_read_seq2 = self.get_merge_edge(
+                    merge_node_idx=self.seq_node_idx[0][seq1_idx],
+                )
+
+                seq1_res.extend([aln_seq1, self.read_from_kmer(merge_idx, 0)])
+                seq2_res.extend([aln_seq2, self.read_from_kmer(merge_idx, 1)])
+            else:
+                # only put the bubble alignment to the result, leave the merge node to further alignment
+                seq1_res.append(aln_seq1)
+                seq2_res.append(aln_seq2)
+
+                # store the last merge node
+                bubble_idx_seq1, bubble_idx_seq2 = [merge_idx], [merge_idx]
+
             seq1_idx += 1
-
-        while (
-            seq2_idx < len(dbg.seq_node_idx[1])
-            and dbg.seq_node_idx[1][seq2_idx] != merge_idx
-        ):
-            bubble_idx_seq2.append(dbg.seq_node_idx[1][seq2_idx])
             seq2_idx += 1
 
-        # if index overflow here, it must be the edge case, call fix function
-        if seq1_idx == len(dbg.seq_node_idx[0]) or seq2_idx == len(dbg.seq_node_idx[1]):
-            print("Fix starts")
-            # a heuristic way to determine the window size
-            dbg.merge_node_idx = merge_indices_fix(dbg)
-            print("Fix ends")
-            return to_alignment(dbg)
+        while seq1_idx < len(self.seq_node_idx[0]):
+            bubble_idx_seq1.append(self.seq_node_idx[0][seq1_idx])
+            seq1_idx += 1
 
-        # add the merge node index to the list
-        bubble_idx_seq1.append(merge_idx)
-        bubble_idx_seq2.append(merge_idx)
+        while seq2_idx < len(self.seq_node_idx[1]):
+            bubble_idx_seq2.append(self.seq_node_idx[1][seq2_idx])
+            seq2_idx += 1
 
-        prev_merge: str = (
-            dbg.read_from_kmer(dbg.merge_node_idx[i - 1], 0) if i > 0 else ""
-        )
-
-        # get alignment of the bubble (with previous merge node nucleotide)
-        bubble_alignment = dbg.bubble_aln(
+        bubble_alignment = self.bubble_aln(
             bubble_indices_seq1=bubble_idx_seq1,
             bubble_indices_seq2=bubble_idx_seq2,
             s=s,
             d=d,
             e=e,
-            prev_edge_read1=merge_edge_read_seq1,
-            prev_edge_read2=merge_edge_read_seq2,
-            prev_merge=prev_merge,
         )
 
-        aln_seq1 = bubble_alignment[0][1:] if i > 0 else bubble_alignment[0]
-        aln_seq2 = bubble_alignment[1][1:] if i > 0 else bubble_alignment[1]
+        seq1_res.append(bubble_alignment[0])
+        seq2_res.append(bubble_alignment[1])
 
-        if i != len(dbg.merge_node_idx) - 1:
-            # extract the duplicate kmer on the merge node out edge
-            merge_edge_read_seq1, merge_edge_read_seq2 = dbg.get_merge_edge(
-                merge_node_idx=dbg.seq_node_idx[0][seq1_idx],
-            )
-
-            seq1_res.extend([aln_seq1, dbg.read_from_kmer(merge_idx, 0)])
-            seq2_res.extend([aln_seq2, dbg.read_from_kmer(merge_idx, 1)])
-        else:
-            # only put the bubble alignment to the result, leave the merge node to further alignment
-            seq1_res.append(aln_seq1)
-            seq2_res.append(aln_seq2)
-
-            # store the last merge node
-            bubble_idx_seq1, bubble_idx_seq2 = [merge_idx], [merge_idx]
-
-        seq1_idx += 1
-        seq2_idx += 1
-
-    while seq1_idx < len(dbg.seq_node_idx[0]):
-        bubble_idx_seq1.append(dbg.seq_node_idx[0][seq1_idx])
-        seq1_idx += 1
-
-    while seq2_idx < len(dbg.seq_node_idx[1]):
-        bubble_idx_seq2.append(dbg.seq_node_idx[1][seq2_idx])
-        seq2_idx += 1
-
-    bubble_alignment = dbg.bubble_aln(
-        bubble_indices_seq1=bubble_idx_seq1,
-        bubble_indices_seq2=bubble_idx_seq2,
-        s=s,
-        d=d,
-        e=e,
-    )
-
-    seq1_res.append(bubble_alignment[0])
-    seq2_res.append(bubble_alignment[1])
-
-    return alignment_to_fasta(
-        {dbg.names[0]: "".join(seq1_res), dbg.names[1]: "".join(seq2_res)}
-    )
+        return alignment_to_fasta(
+            {self.names[0]: "".join(seq1_res), self.names[1]: "".join(seq2_res)}
+        )
 
 
 @click.command()  # pragma: no cover
@@ -741,7 +590,7 @@ def to_alignment(
 )
 def cli(infile, outfile, k, moltype, match, transition, transversion, d, e):
     dbg = deBruijn(infile, k, moltype)
-    aln = to_alignment(dbg, match, transition, transversion, d, e)
+    aln = dbg.alignment(match, transition, transversion, d, e)
     out_path = Path(outfile)
     with open(f"{out_path.stem}_k{k}{out_path.suffix}", "w") as f:
         f.write(aln)

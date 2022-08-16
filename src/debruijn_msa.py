@@ -375,36 +375,27 @@ class deBruijnMultiSeqs:
         # no chance that next node is End NodeType, we won't call this function for the last merge node
         return seqs_edge_kmer
 
+    def alignment(
+        self,
+        model: str,
+        indel_rate: float = 0.01,
+        indel_length: float = 0.01,
+    ) -> str:
+        """Use de Bruijn graph to align multiple sequences
 
-def msa_alignment(
-    dbg: deBruijnMultiSeqs,
-    match: int = 10,
-    transition: int = -1,
-    transversion: int = -8,
-    d: int = 10,
-    e: int = 2,
-) -> str:
-    """Use de Bruijn graph to align multiple sequences
+        Parameters
+        ----------
+        model : str
+            a substitution model or the name of one, see cogent3.available_models()
+        indel_rate : float
+            one parameter for the progressive pair-HMM
+        indel_length : float
+            one parameter for the progressive pair-HMM
 
-    Parameters
-    ----------
-    dbg : deBruijnMultiSeqs
-        deBruijn object containing all sequences
-    match : int
-        score for two matching nucleotide
-    transition : int
-        cost for DNA transition mutation
-    transversion : int
-        cost for DNA transversion mutation
-    d : int
-        gap open costs. Defaults to 10
-    e : int
-        gap extend costs. Defaults to 2
+        Returns
+        -------
+        str
+            the fasta representation of the multiple-sequence alignment result
 
-    Returns
-    -------
-    str
-        the fasta representation of the alignment result
-
-    """
-    pass
+        """
+        pass

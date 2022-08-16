@@ -1,7 +1,7 @@
 from cogent3.align import make_dna_scoring_dict
 from cogent3.format.fasta import alignment_to_fasta
 from cogent3.core.alphabet import AlphabetError
-from cogent3 import SequenceCollection
+from cogent3 import SequenceCollection, load_unaligned_seqs
 import pytest
 
 from src.debruijn_pairwise import *
@@ -53,7 +53,7 @@ def example_checker(
     assert debruijn_merge_correctness(db.extract_bubble()) == exp_correct
 
     # two aligned sequences should have the same length
-    aln_result = to_alignment(dbg=db)
+    aln_result = db.alignment()
     assert len(aln_result[0]) == len(aln_result[1])
     exp_aln_fasta = alignment_to_fasta({"seq1": exp_aln[0], "seq2": exp_aln[1]})
     assert aln_result == exp_aln_fasta
@@ -189,37 +189,6 @@ def test_get_kmers():
         get_kmers(test_seq2, 16)
     exec_msg = e.value.args[0]
     assert exec_msg == "Invalid k size for kmers"
-
-
-def test_mapping_shift():
-    # Test case 1
-    seq1 = "TGTAAGCGA"
-    seq2 = "GTACAAGCGA"
-    db = deBruijn([seq1, seq2], k=3, moltype="dna")
-    shift_res = mapping_shifts(db)
-    assert shift_res == {"node_indices": [2, 4, 5, 6, 7], "shifts": [-1, 1, 1, 1, 1]}
-
-    # Test case 2
-    seq1 = "TACCACGTAAT"
-    seq2 = "TACGACCTAAT"
-    db = deBruijn([seq1, seq2], k=3, moltype="dna")
-    shift_res = mapping_shifts(db)
-    assert shift_res == {"node_indices": [1, 8, 9], "shifts": [0, 0, 0]}
-
-    # Test case 3
-    seq1 = "TACCGTCCAGACGTAAT"
-    seq2 = "TACGGTCCAGACCTAAT"
-    db = deBruijn([seq1, seq2], k=3, moltype="dna")
-    shift_res = mapping_shifts(db)
-    assert shift_res == {
-        "node_indices": [1, 4, 5, 6, 7, 8, 9, 12, 13],
-        "shifts": [0, 1, 1, 1, 1, 1, 1, 2, 2],
-    }
-
-    # Test case 4
-    db = seq1
-    with pytest.raises(AssertionError):
-        shift_res = mapping_shifts(db)
 
 
 def test_duplicate_kmers():
@@ -386,33 +355,27 @@ def test_unrelated_sequences():
 
 
 def test_edge_case1():
-    # NOTE: Two sequences whose de Bruijn graph contain a circle
+    # NOTE: Two sequences whose de Bruijn graph contain a circle, expected to throw an error
     seq1 = "TACCACGTAAT"
     seq2 = "TACGACCTAAT"
-    example_checker(
-        seqs="./tests/data/edge_case1.fasta",
-        k=3,
-        exp_seq1_idx=list(range(11)),
-        exp_seq2_idx=[11, 1, 5, 12, 13, 2, 14, 15, 8, 9, 16],
-        exp_correct=True,
-        exp_merge=[1, 8, 9],
-        exp_aln=(seq1, seq2),
-    )
+    with pytest.raises(ValueError) as e:
+        deBruijn([seq1, seq2], k=3, moltype="dna")
+        assert (
+            e.value
+            == "Cycles detected in de Bruijn graph, usually caused by small kmer sizes"
+        )
 
 
 def test_edge_case2():
-    # NOTE: Two sequences whose de Bruijn graph contain a more complex circle
+    # NOTE: Two sequences whose de Bruijn graph contain a more complex circle, expected to throw an error
     seq1 = "TACCGTCCAGACGTAAT"
     seq2 = "TACGGTCCAGACCTAAT"
-    example_checker(
-        seqs="./tests/data/edge_case2.fasta",
-        k=3,
-        exp_seq1_idx=list(range(15)),
-        exp_seq2_idx=[15, 1, 10, 16, 17, 4, 5, 6, 7, 8, 9, 2, 18, 19, 12, 13, 20],
-        exp_correct=True,
-        exp_merge=[1, 4, 5, 6, 7, 8, 9, 12, 13],
-        exp_aln=(seq1, seq2),
-    )
+    with pytest.raises(ValueError) as e:
+        deBruijn([seq1, seq2], k=3, moltype="dna")
+        assert (
+            e.value
+            == "Cycles detected in de Bruijn graph, usually caused by small kmer sizes"
+        )
 
 
 if __name__ == "__main__":

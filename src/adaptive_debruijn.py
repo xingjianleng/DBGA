@@ -156,7 +156,7 @@ def adpt_dbg_alignment_recursive(
         the aligned sequences
     """
 
-    # FIXME: Two versions for adaptive de Bruijn alignment
+    # Two versions for adaptive de Bruijn alignment
     # 1. Use brute-force, descend from large k to smaller k
     # 2. Use mathematics and statistics ways to analyse the similarity between sequences to choose k
     # print(k_index, k_choice)
