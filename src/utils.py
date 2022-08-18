@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple, Set, Union
 
 from cogent3.align import global_pairwise
+from cogent3.align.progressive import TreeAlign
 from cogent3 import load_unaligned_seqs, make_unaligned_seqs
 from cogent3 import SequenceCollection
 import graphviz
@@ -184,6 +185,60 @@ def dna_global_aln(
         return "-" * len(seq2), seq2
     else:
         return "", ""
+
+
+def dna_msa(
+    seqs: SequenceCollection,
+    model: str = "F81",
+    indel_rate: float = 0.01,
+    indel_length: float = 0.01,
+) -> SequenceCollection:
+    """_summary_
+
+    Parameters
+    ----------
+    seqs : SequenceCollection
+        the SequenceCollection object of all sequences that need to be aligned
+    model : str, optional
+        a substitution model or the name of one, see cogent3.available_models(), by default "F81"
+    indel_rate : float, optional
+        one parameter for the progressive pair-HMM, by default 0.01
+    indel_length : float, optional
+        one parameter for the progressive pair-HMM, by default 0.01
+
+    Returns
+    -------
+    SequenceCollection
+        the SequenceCollection representation of the multiple-sequence alignment result
+    """
+    seqs_not_non = seqs.take_seqs_if(lambda seq: len(seq) > 0)
+    seqs_non = seqs.take_seqs_if(lambda seq: len(seq) > 0, negate=True)
+    if type(seqs_non) == dict:
+        # all sequences not null
+        aln, _ = TreeAlign(
+            model=model,
+            seqs=seqs_not_non,
+            indel_rate=indel_rate,
+            indel_length=indel_length,
+        )
+        return aln
+    elif type(seqs_not_non) == dict:
+        # case where all sequences is empty
+        return seqs
+    elif seqs_not_non.num_seqs == 1:
+        # case where only one sequence is not empty
+        return seqs_not_non.add_seqs(seqs_non)
+    else:
+        aln, _ = TreeAlign(
+            model=model,
+            seqs=seqs_not_non,
+            indel_rate=indel_rate,
+            indel_length=indel_length,
+        )
+        seqs_non_sc = make_unaligned_seqs(
+            {name: aln.seq_len * "-" for name in seqs_non.names}, moltype=seqs.moltype
+        )
+        return aln.add_seqs(seqs_non_sc)
 
 
 def debruijn_merge_correctness(

@@ -4,7 +4,6 @@ from typing import Any, Dict, List, Tuple, Set, Union
 from utils import *
 
 from cogent3 import SequenceCollection
-from cogent3.align.progressive import TreeAlign
 from cogent3.format.fasta import alignment_to_fasta
 
 
@@ -362,6 +361,7 @@ class deBruijnMultiSeqs:
         indel_rate: float = 0.01,
         indel_length: float = 0.01,
         prev_merge: str = "",
+        moltype: str = "dna",
     ) -> List[str]:
         """_summary_
 
@@ -379,6 +379,8 @@ class deBruijnMultiSeqs:
             one parameter for the progressive pair-HMM, by default 0.01
         prev_merge : str, optional
             the previous merge node nucleotide, by default ""
+        moltype : str, optional
+            the molecular type for nucleotides in sequences, by default "dna"
 
         Returns
         -------
@@ -391,10 +393,11 @@ class deBruijnMultiSeqs:
                     i
                 ]: f"{prev_merge}{prev_edge_reads[i]}{self.extract_bubble_seq(bubble_indices_seq_i, i)}"
                 for i, bubble_indices_seq_i in enumerate(bubble_indices)
-            }
+            },
+            moltype=moltype,
         )
-        aln, _ = TreeAlign(
-            model=model, seqs=seqs_sc, indel_rate=indel_rate, indel_length=indel_length
+        aln = dna_msa(
+            seqs=seqs_sc, model=model, indel_rate=indel_rate, indel_length=indel_length
         )
         return [str(aln_seq) for aln_seq in aln.take_seqs(self.names).seqs]
 
@@ -446,9 +449,9 @@ class deBruijnMultiSeqs:
         """
         # Case where each sequence is independent from each other
         if not self.merge_node_idx:
-            aln, _ = TreeAlign(
-                model=model,
+            aln = dna_msa(
                 seqs=self.sc,
+                model=model,
                 indel_rate=indel_rate,
                 indel_length=indel_length,
             )
@@ -492,6 +495,7 @@ class deBruijnMultiSeqs:
 
                 else:
                     # don't include tail merge node in alignment
+                    prev_merge_str = ""
                     bubble_alignment = self.bubble_aln(
                         bubble_indices=bubble_indices,
                         prev_edge_reads=merge_edge_read,
@@ -502,7 +506,9 @@ class deBruijnMultiSeqs:
                     )
                 for j in range(len(self.names)):
                     aln[j].append(
-                        bubble_alignment[j][1:] if i > 0 else bubble_alignment[j]
+                        bubble_alignment[j][1:]
+                        if prev_merge_str
+                        else bubble_alignment[j]
                     )
             else:
                 merge_node_idx = self.expansion[0][i]
@@ -514,6 +520,13 @@ class deBruijnMultiSeqs:
                 # if a bubble is followed by a merge node, record the out edges
                 if type(self.expansion[0][i + 1]) == list:
                     merge_edge_read = self.get_merge_edge(merge_node_idx=merge_node_idx)
+
+        aln_str = ["".join(aln_seq) for aln_seq in aln]
+        aln_length = len(aln_str[0])
+        if not all(len(aln_seq) == aln_length for aln_seq in aln_str):
+            raise ValueError(
+                "Incorrect multiple sequence alignment generated, usually caused by small kmer sizes"
+            )
 
         return alignment_to_fasta(
             {name: "".join(aln[i]) for i, name in enumerate(self.names)}
