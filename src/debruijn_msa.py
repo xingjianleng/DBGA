@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Tuple, Set, Union
 from utils import *
 
 from cogent3 import SequenceCollection
+from cogent3.align.progressive import TreeAlign
+from cogent3.format.fasta import alignment_to_fasta
 
 
 class deBruijnMultiSeqs:
@@ -352,6 +354,50 @@ class deBruijnMultiSeqs:
         #     rtn.append(self.read_from_kmer(last_node_idx, seq_idx=seq_idx))
         return "".join(rtn)
 
+    def bubble_aln(
+        self,
+        bubble_indices: List[List[int]],
+        prev_edge_reads: List[str],
+        model: str = "F81",
+        indel_rate: float = 0.01,
+        indel_length: float = 0.01,
+        prev_merge: str = "",
+    ) -> List[str]:
+        """_summary_
+
+        Parameters
+        ----------
+        bubble_indices : List[List[int]]
+            the list containing indices of nodes for each sequence in the bubble
+        prev_edge_reads : List[str]
+            the edge kmer from the edge of the last merge node for each sequence
+        model : str, optional
+            a substitution model or the name of one, see cogent3.available_models(), by default "F81"
+        indel_rate : float, optional
+            one parameter for the progressive pair-HMM, by default 0.01
+        indel_length : float, optional
+            one parameter for the progressive pair-HMM, by default 0.01
+        prev_merge : str, optional
+            the previous merge node nucleotide, by default ""
+
+        Returns
+        -------
+        List[str]
+            the aligned sequences from the bubble in the de Bruijn graph
+        """
+        seqs_sc = make_unaligned_seqs(
+            {
+                self.names[
+                    i
+                ]: f"{prev_merge}{prev_edge_reads[i]}{self.extract_bubble_seq(bubble_indices_seq_i, i)}"
+                for i, bubble_indices_seq_i in enumerate(bubble_indices)
+            }
+        )
+        aln, _ = TreeAlign(
+            model=model, seqs=seqs_sc, indel_rate=indel_rate, indel_length=indel_length
+        )
+        return [str(aln_seq) for aln_seq in aln.take_seqs(self.names).seqs]
+
     def get_merge_edge(self, merge_node_idx: int) -> List[str]:
         """To get the duplicate_kmer from the edge that is from the merge node
 
@@ -377,7 +423,7 @@ class deBruijnMultiSeqs:
 
     def alignment(
         self,
-        model: str,
+        model: str = "F81",
         indel_rate: float = 0.01,
         indel_length: float = 0.01,
     ) -> str:
@@ -398,4 +444,77 @@ class deBruijnMultiSeqs:
             the fasta representation of the multiple-sequence alignment result
 
         """
-        pass
+        # Case where each sequence is independent from each other
+        if not self.merge_node_idx:
+            aln, _ = TreeAlign(
+                model=model,
+                seqs=self.sc,
+                indel_rate=indel_rate,
+                indel_length=indel_length,
+            )
+            alignment_seqs = [
+                str(aln_seq) for aln_seq in aln.take_seqs(self.names).seqs
+            ]
+            return alignment_to_fasta(
+                {name: alignment_seqs[i] for i, name in enumerate(self.names)}
+            )
+
+        # add accumulator for aligned part of sequences
+        aln = []
+        merge_edge_read = []
+        for i in range(len(self.names)):
+            aln.append([])
+            merge_edge_read.append("")
+        prev_merge_str: str = ""
+
+        max_iter = len(self.expansion[0])
+        # [bubble, merge, bubble ... bubble, merge, bubble]
+        for i in range(max_iter):
+            if type(self.expansion[0][i]) == list:
+                # extract bubbles
+                bubble_indices = []
+                for j in range(len(self.names)):
+                    bubble_indices.append(self.expansion[j][i])
+
+                # align the bubble
+                if i != max_iter - 1:
+                    # include the tail merge node
+                    for j in range(len(self.names)):
+                        bubble_indices[j].append(self.expansion[j][i + 1])
+                    bubble_alignment = self.bubble_aln(
+                        bubble_indices=bubble_indices,
+                        prev_edge_reads=merge_edge_read,
+                        model=model,
+                        indel_rate=indel_rate,
+                        indel_length=indel_length,
+                        prev_merge=prev_merge_str,
+                    )
+
+                else:
+                    # don't include tail merge node in alignment
+                    bubble_alignment = self.bubble_aln(
+                        bubble_indices=bubble_indices,
+                        prev_edge_reads=merge_edge_read,
+                        model=model,
+                        indel_rate=indel_rate,
+                        indel_length=indel_length,
+                        prev_merge=prev_merge_str,
+                    )
+                for j in range(len(self.names)):
+                    aln[j].append(
+                        bubble_alignment[j][1:] if i > 0 else bubble_alignment[j]
+                    )
+            else:
+                merge_node_idx = self.expansion[0][i]
+                # record the prev merge node
+                prev_merge_str: str = self.read_from_kmer(merge_node_idx, 0)
+                for j in range(len(self.names)):
+                    aln[j].append(prev_merge_str)
+
+                # if a bubble is followed by a merge node, record the out edges
+                if type(self.expansion[0][i + 1]) == list:
+                    merge_edge_read = self.get_merge_edge(merge_node_idx=merge_node_idx)
+
+        return alignment_to_fasta(
+            {name: "".join(aln[i]) for i, name in enumerate(self.names)}
+        )
