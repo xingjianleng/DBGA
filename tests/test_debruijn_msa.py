@@ -1,4 +1,3 @@
-from multiprocessing.sharedctypes import Value
 import pytest
 
 from src.debruijn_msa import *
@@ -55,15 +54,21 @@ def test_msa_example1():
     )
 
 
-def test_msa_example2_fail():
-    with pytest.raises(ValueError) as e:
-        deBruijnMultiSeqs(
-            "./tests/data/msa_example2.fasta", k=3, moltype="dna"
-        ).alignment()
-        assert (
-            e.value
-            == "Incorrect multiple sequence alignment generated, usually caused by small kmer sizes"
-        )
+def test_msa_example2_not_optimal():
+    seq1 = "GTAATTGCCACGCGA--"
+    seq2 = "GTAATTGCCT--CGAGA"
+    seq3 = "GTAATTGCCACGCGA--"
+    msa_three_seqs_checker(
+        seqs="./tests/data/msa_example2.fasta",
+        k=3,
+        exp_seqs_idx=[
+            list(range(15)),
+            [15, 1, 2, 3, 4, 5, 6, 7, 16, 17, 18, 13, 19, 20, 21],
+            [22, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 23],
+        ],
+        exp_merge=[1, 2, 3, 4, 5, 6, 7, 13],
+        exp_aln=(seq1, seq2, seq3),
+    )
 
 
 def test_msa_example2_success():
@@ -109,7 +114,6 @@ def test_msa_example3_success():
     )
 
 
-@pytest.mark.skip(reason="current unfixed bug")
 def test_msa_example4():
     seq1 = "GTACAAGCGATG"
     seq2 = "GTACAAGCGA--"

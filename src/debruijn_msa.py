@@ -470,8 +470,9 @@ class deBruijnMultiSeqs:
             merge_edge_read.append("")
         prev_merge_str: str = ""
 
-        max_iter = len(self.expansion[0])
+        max_iter = len(self.expansion[0]) - 2
         # [bubble, merge, bubble ... bubble, merge, bubble]
+        # NOTE: Leave the last merge node with last bubble
         for i in range(max_iter):
             if type(self.expansion[0][i]) == list:
                 # extract bubbles
@@ -480,30 +481,17 @@ class deBruijnMultiSeqs:
                     bubble_indices.append(self.expansion[j][i])
 
                 # align the bubble
-                if i != max_iter - 1:
-                    # include the tail merge node
-                    for j in range(len(self.names)):
-                        bubble_indices[j].append(self.expansion[j][i + 1])
-                    bubble_alignment = self.bubble_aln(
-                        bubble_indices=bubble_indices,
-                        prev_edge_reads=merge_edge_read,
-                        model=model,
-                        indel_rate=indel_rate,
-                        indel_length=indel_length,
-                        prev_merge=prev_merge_str,
-                    )
-
-                else:
-                    # don't include tail merge node in alignment
-                    prev_merge_str = ""
-                    bubble_alignment = self.bubble_aln(
-                        bubble_indices=bubble_indices,
-                        prev_edge_reads=merge_edge_read,
-                        model=model,
-                        indel_rate=indel_rate,
-                        indel_length=indel_length,
-                        prev_merge=prev_merge_str,
-                    )
+                # include the tail merge node
+                for j in range(len(self.names)):
+                    bubble_indices[j].append(self.expansion[j][i + 1])
+                bubble_alignment = self.bubble_aln(
+                    bubble_indices=bubble_indices,
+                    prev_edge_reads=merge_edge_read,
+                    model=model,
+                    indel_rate=indel_rate,
+                    indel_length=indel_length,
+                    prev_merge=prev_merge_str,
+                )
                 for j in range(len(self.names)):
                     aln[j].append(
                         bubble_alignment[j][1:]
@@ -513,13 +501,35 @@ class deBruijnMultiSeqs:
             else:
                 merge_node_idx = self.expansion[0][i]
                 # record the prev merge node
-                prev_merge_str: str = self.read_from_kmer(merge_node_idx, 0)
                 for j in range(len(self.names)):
-                    aln[j].append(prev_merge_str)
+                    merge_read = self.read_from_kmer(merge_node_idx, j)
+                    prev_merge_str = (
+                        merge_read if len(merge_read) == 1 else prev_merge_str
+                    )
+                    aln[j].append(merge_read)
 
                 # if a bubble is followed by a merge node, record the out edges
                 if type(self.expansion[0][i + 1]) == list:
                     merge_edge_read = self.get_merge_edge(merge_node_idx=merge_node_idx)
+
+        # align the last bubble with the last merge node
+        bubble_indices = []
+        merge_edge_read = []
+        for j in range(self.num_seq):
+            appended_lst = [self.expansion[j][-2]]
+            appended_lst.extend(self.expansion[j][-1])
+            bubble_indices.append(appended_lst)
+            merge_edge_read.append("")
+        bubble_alignment = self.bubble_aln(
+            bubble_indices=bubble_indices,
+            prev_edge_reads=merge_edge_read,
+            model=model,
+            indel_rate=indel_rate,
+            indel_length=indel_length,
+            prev_merge="",
+        )
+        for j in range(len(self.names)):
+            aln[j].append(bubble_alignment[j])
 
         aln_str = ["".join(aln_seq) for aln_seq in aln]
         aln_length = len(aln_str[0])
