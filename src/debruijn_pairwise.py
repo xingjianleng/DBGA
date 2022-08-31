@@ -5,8 +5,7 @@ from utils import *
 
 import click
 from cogent3.align import make_dna_scoring_dict
-from cogent3.format.fasta import alignment_to_fasta
-from cogent3 import SequenceCollection
+from cogent3 import SequenceCollection, make_aligned_seqs
 
 
 class deBruijn:
@@ -456,9 +455,7 @@ class deBruijn:
             alignment = dna_global_aln(
                 str(self.sequences[0]), str(self.sequences[1]), s=s, d=d, e=e
             )
-            return alignment_to_fasta(
-                {self.names[0]: alignment[0], self.names[1]: alignment[1]}
-            )
+            return {self.names[0]: alignment[0], self.names[1]: alignment[1]}
 
         seq1_idx, seq2_idx = 0, 0
         seq1_res, seq2_res = [], []
@@ -541,9 +538,7 @@ class deBruijn:
         seq1_res.append(bubble_alignment[0])
         seq2_res.append(bubble_alignment[1])
 
-        return alignment_to_fasta(
-            {self.names[0]: "".join(seq1_res), self.names[1]: "".join(seq2_res)}
-        )
+        return {self.names[0]: "".join(seq1_res), self.names[1]: "".join(seq2_res)}
 
 
 @click.command()  # pragma: no cover
@@ -590,10 +585,12 @@ class deBruijn:
 )
 def cli(infile, outfile, k, moltype, match, transition, transversion, d, e):
     dbg = deBruijn(infile, k, moltype)
-    aln = dbg.alignment(match, transition, transversion, d, e)
+    aln = make_aligned_seqs(
+        dbg.alignment(match, transition, transversion, d, e), moltype=moltype
+    )
     out_path = Path(outfile)
     with open(f"{out_path.stem}_k{k}{out_path.suffix}", "w") as f:
-        f.write(aln)
+        f.write(aln.to_fasta())
 
 
 if __name__ == "__main__":  # pragma: no cover

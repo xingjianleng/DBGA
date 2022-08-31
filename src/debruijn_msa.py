@@ -1,10 +1,10 @@
 from __future__ import annotations
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Set, Union
 from utils import *
 
 from cogent3 import SequenceCollection
-from cogent3.format.fasta import alignment_to_fasta
 
 
 class deBruijnMultiSeqs:
@@ -358,6 +358,7 @@ class deBruijnMultiSeqs:
         bubble_indices: List[List[int]],
         prev_edge_reads: List[str],
         model: str = "F81",
+        tree: Any = None,
         indel_rate: float = 0.01,
         indel_length: float = 0.01,
         prev_merge: str = "",
@@ -397,7 +398,11 @@ class deBruijnMultiSeqs:
             moltype=moltype,
         )
         aln = dna_msa(
-            seqs=seqs_sc, model=model, indel_rate=indel_rate, indel_length=indel_length
+            seqs=seqs_sc,
+            model=model,
+            tree=tree,
+            indel_rate=indel_rate,
+            indel_length=indel_length,
         )
         return [str(aln_seq) for aln_seq in aln.take_seqs(self.names).seqs]
 
@@ -427,6 +432,7 @@ class deBruijnMultiSeqs:
     def alignment(
         self,
         model: str = "F81",
+        tree: Any = None,
         indel_rate: float = 0.01,
         indel_length: float = 0.01,
     ) -> str:
@@ -436,10 +442,12 @@ class deBruijnMultiSeqs:
         ----------
         model : str
             a substitution model or the name of one, see cogent3.available_models()
+        tree : Any, optinal
+            a guide tree for multiple sequence alignment, by default None
         indel_rate : float
-            one parameter for the progressive pair-HMM
+            one parameter for the progressive pair-HMM, by default 0.01
         indel_length : float
-            one parameter for the progressive pair-HMM
+            one parameter for the progressive pair-HMM, by default 0.01
 
         Returns
         -------
@@ -458,9 +466,7 @@ class deBruijnMultiSeqs:
             alignment_seqs = [
                 str(aln_seq) for aln_seq in aln.take_seqs(self.names).seqs
             ]
-            return alignment_to_fasta(
-                {name: alignment_seqs[i] for i, name in enumerate(self.names)}
-            )
+            return {name: alignment_seqs[i] for i, name in enumerate(self.names)}
 
         # add accumulator for aligned part of sequences
         aln = []
@@ -478,7 +484,7 @@ class deBruijnMultiSeqs:
                 # extract bubbles
                 bubble_indices = []
                 for j in range(len(self.names)):
-                    bubble_indices.append(self.expansion[j][i])
+                    bubble_indices.append(deepcopy(self.expansion[j][i]))
 
                 # align the bubble
                 # include the tail merge node
@@ -488,6 +494,7 @@ class deBruijnMultiSeqs:
                     bubble_indices=bubble_indices,
                     prev_edge_reads=merge_edge_read,
                     model=model,
+                    tree=tree,
                     indel_rate=indel_rate,
                     indel_length=indel_length,
                     prev_merge=prev_merge_str,
@@ -524,6 +531,7 @@ class deBruijnMultiSeqs:
             bubble_indices=bubble_indices,
             prev_edge_reads=merge_edge_read,
             model=model,
+            tree=tree,
             indel_rate=indel_rate,
             indel_length=indel_length,
             prev_merge="",
@@ -538,6 +546,4 @@ class deBruijnMultiSeqs:
                 "Incorrect multiple sequence alignment generated, usually caused by small kmer sizes"
             )
 
-        return alignment_to_fasta(
-            {name: "".join(aln[i]) for i, name in enumerate(self.names)}
-        )
+        return {name: "".join(aln[i]) for i, name in enumerate(self.names)}

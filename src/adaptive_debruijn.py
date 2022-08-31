@@ -1,13 +1,13 @@
-from debruijn_pairwise import (
-    deBruijn,
-    load_sequences,
-    NodeType,
-    dna_global_aln,
-    get_kmers,
-)
+from debruijn_pairwise import deBruijn
 import math
 from pathlib import Path
 from typing import Any, Tuple, List, Union
+from utils import (
+    dna_global_aln,
+    load_sequences,
+    NodeType,
+    predict_final_p,
+)
 
 import click
 from cogent3.align import make_dna_scoring_dict
@@ -31,24 +31,6 @@ def get_seqs_entropy(seqs_collection):
     suggested_k = math.ceil(math.log(len(seqs), 4))
     counts = CategoryCounter(seqs.iter_kmers(k=suggested_k))
     return counts.entropy
-
-
-def predict_p(seqs, k):
-    # seqs is a SequenceCollection object
-    kmers_seq0_set = set(get_kmers(str(seqs.seqs[0]), k))
-    kmers_seq1_set = set(get_kmers(str(seqs.seqs[1]), k))
-    set_union = kmers_seq0_set | kmers_seq1_set
-    set_intersection = kmers_seq0_set & kmers_seq1_set
-
-    p_prime = len(set_intersection) / len(set_union)
-    p = p_prime ** (1 / k)
-    return p
-
-
-def predict_final_p(seqs):
-    min_k = math.ceil(math.log(min(map(len, seqs.seqs)), 4))
-    max_k = math.ceil(math.log2(min(map(len, seqs.seqs)))) + 10
-    return min([p for p in (predict_p(seqs, k) for k in range(min_k, max_k))])
 
 
 def adpt_dbg_alignment(

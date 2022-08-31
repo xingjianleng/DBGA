@@ -1,11 +1,14 @@
 from __future__ import annotations
 from collections import Counter
 from enum import Enum, auto
+from itertools import combinations
+import math
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Set, Union
 
 from cogent3.align import global_pairwise
 from cogent3.align.progressive import TreeAlign
+from cogent3.evolve.fast_distance import DistanceMatrix
 from cogent3 import load_unaligned_seqs, make_unaligned_seqs
 from cogent3 import SequenceCollection
 import graphviz
@@ -190,6 +193,7 @@ def dna_global_aln(
 def dna_msa(
     seqs: SequenceCollection,
     model: str = "F81",
+    tree: Any = None,
     indel_rate: float = 0.01,
     indel_length: float = 0.01,
 ) -> SequenceCollection:
@@ -201,6 +205,8 @@ def dna_msa(
         the SequenceCollection object of all sequences that need to be aligned
     model : str, optional
         a substitution model or the name of one, see cogent3.available_models(), by default "F81"
+    tree : Any, optinal
+        a guide tree for multiple sequence alignment, by default None
     indel_rate : float, optional
         one parameter for the progressive pair-HMM, by default 0.01
     indel_length : float, optional
@@ -218,6 +224,7 @@ def dna_msa(
         aln, _ = TreeAlign(
             model=model,
             seqs=seqs_not_non,
+            tree=tree,
             indel_rate=indel_rate,
             indel_length=indel_length,
         )
@@ -232,6 +239,7 @@ def dna_msa(
         aln, _ = TreeAlign(
             model=model,
             seqs=seqs_not_non,
+            tree=tree,
             indel_rate=indel_rate,
             indel_length=indel_length,
         )
@@ -295,6 +303,74 @@ def to_DOT(nodes: List[Node]) -> graphviz.Digraph:
                 weight=str(edge.multiplicity),
             )
     return dot
+
+
+def predict_p(seqs: SequenceCollection, k: int) -> float:
+    """predict similarity for of two sequences with the k size given using IoU of kmers
+
+    Parameters
+    ----------
+    seqs : SequenceCollection
+        SequenceCollection object containing two sequences
+    k : int
+        kmer size chosen
+
+    Returns
+    -------
+    float
+        the predicted similarity of sequences for given k size
+    """
+    # seqs is a SequenceCollection object
+    kmers_seq0_set = set(get_kmers(str(seqs.seqs[0]), k))
+    kmers_seq1_set = set(get_kmers(str(seqs.seqs[1]), k))
+    set_union = kmers_seq0_set | kmers_seq1_set
+    set_intersection = kmers_seq0_set & kmers_seq1_set
+
+    p_prime = len(set_intersection) / len(set_union)
+    p = p_prime ** (1 / k)
+    return p
+
+
+def predict_final_p(seqs: SequenceCollection) -> float:
+    """estimate the general similarity between two sequences using IoU of kmers
+
+    Parameters
+    ----------
+    seqs : SequenceCollection
+        the SequenceCollection containing pairwise sequences
+
+    Returns
+    -------
+    float
+        the predicted general similarity of sequences for given k size
+    """
+    min_k = math.ceil(math.log(min(map(len, seqs.seqs)), 4))
+    max_k = math.ceil(math.log2(min(map(len, seqs.seqs)))) + 10
+    return min([p for p in (predict_p(seqs, k) for k in range(min_k, max_k))])
+
+
+def tree_prediction(seq_sc: SequenceCollection) -> Any:
+    """generate the estimated tree for input sequences using the predicted pairwise similarity
+
+    Parameters
+    ----------
+    seq_sc : SequenceCollection
+        the SequenceCollection containing multiple sequences
+
+    Returns
+    -------
+    Any
+        the estimated tree using the predicted pairwise similarity
+    """
+    dist_dict = {}
+    for seq_name1, seq_name2 in combinations(seq_sc.names, r=2):
+        sub_seqs = seq_sc.take_seqs((seq_name1, seq_name2))
+        distance = 1 - predict_final_p(sub_seqs)
+        dist_dict[(seq_name1, seq_name2)] = distance
+        dist_dict[(seq_name2, seq_name1)] = distance
+    dm = DistanceMatrix(dist_dict)
+    tree = dm.quick_tree(True)
+    return tree
 
 
 # NodeType class to indicate the type of node (start/middle/end)

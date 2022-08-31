@@ -28,10 +28,7 @@ def msa_three_seqs_checker(seqs, k, exp_seqs_idx, exp_merge, exp_aln):
     # two aligned sequences should have the same length
     aln_result = db.alignment()
 
-    exp_aln_fasta = alignment_to_fasta(
-        {f"seq{i + 1}": exp_aln[i] for i in range(db.num_seq)}
-    )
-    assert aln_result == exp_aln_fasta
+    assert aln_result == {f"seq{i + 1}": exp_aln[i] for i in range(db.num_seq)}
 
     # merge node IDs should be the same as expectation
     assert db.merge_node_idx == exp_merge

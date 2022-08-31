@@ -5,6 +5,7 @@
 # tmp files and caches
 .coverage
 **/__pycache__
+**/.ipynb_checkpoints
 
 # Developer
 .vscode/*

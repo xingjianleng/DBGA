@@ -88,10 +88,14 @@ def gbparser(in_path: str, out_path: str) -> None:
 
 
 if __name__ == "__main__":
-    files_count = 2
-    path = Path("../data/raw/influenza.fasta")
-    processed_path = Path("../data/processed")
-    for i in range(files_count):
-        with open(f"{processed_path}/influenza-similar{i + 1}.fasta", "w") as f:
-            f.write(sample_random_seqs(path, moltype="dna"))
-    # gbparser("../data/raw/mers.gb", "../data/processed/mers.fasta")
+    # files_count = 2
+    # path = Path("../data/raw/influenza.fasta")
+    # processed_path = Path("../data/processed")
+    # for i in range(files_count):
+    #     with open(f"{processed_path}/influenza-similar{i + 1}.fasta", "w") as f:
+    #         f.write(sample_random_seqs(path, moltype="dna"))
+    raw_path = Path("../data/corona_raw")
+    processed_path = Path("../data/corona_processed")
+    for filename in raw_path.iterdir():
+        out_name = Path(f"{processed_path / filename.stem}.fasta")
+        gbparser(filename, out_name)
