@@ -37,7 +37,7 @@ def calculate_k(path: Path, thresh: int, moltype: str):
     type=float,
     default=0.001,
     required=False,
-    help="Proportion of duplicate kmers im each sequence",
+    help="Proportion of duplicate kmers im each sequence, by default 0.001",
 )
 def cli(infile, thresh):
     path = Path(infile).expanduser().absolute()

@@ -1,6 +1,5 @@
 from debruijn_pairwise import deBruijn
 import math
-from pathlib import Path
 from typing import Any, Tuple, List, Union
 from utils import (
     dna_global_aln,
@@ -248,55 +247,3 @@ def adpt_dbg_alignment_recursive(
         aln[seq_idx].append(tail_bubble_aln[seq_idx])
 
     return "".join(aln[0]), "".join(aln[1])
-
-
-@click.command()
-@click.option(
-    "--infile", type=str, required=True, help="input unaligned sequences file"
-)
-@click.option(
-    "--outfile", type=str, required=True, help="output aligned file destination"
-)
-@click.option(
-    "--moltype",
-    default="dna",
-    type=str,
-    required=False,
-    help="molecular type of sequences",
-)
-@click.option(
-    "--match",
-    default=10,
-    type=int,
-    required=False,
-    help="score for two matching nucleotide",
-)
-@click.option(
-    "--transition",
-    default=-1,
-    type=int,
-    required=False,
-    help="cost for DNA transition mutation",
-)
-@click.option(
-    "--transversion",
-    default=-8,
-    type=int,
-    required=False,
-    help="cost for DNA transversion mutation",
-)
-@click.option(
-    "--d", default=10, type=int, required=False, help="costs for opening a gap"
-)
-@click.option(
-    "--e", default=2, type=int, required=False, help="costs for extending a gap"
-)
-def cli(infile, outfile, moltype, match, transition, transversion, d, e):
-    aln = adpt_dbg_alignment(infile, moltype, match, transition, transversion, d, e)
-    out_path = Path(outfile)
-    with open(f"{out_path.stem}{out_path.suffix}", "w") as f:
-        f.write(aln)
-
-
-if __name__ == "__main__":
-    cli()

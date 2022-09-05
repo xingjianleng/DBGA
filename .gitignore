@@ -1,6 +1,6 @@
 # Larger files
-/data/
-/benchmark/
+data/*
+benchmark/*
 
 # tmp files and caches
 .coverage
@@ -11,3 +11,6 @@
 .vscode/*
 .idea/*
 .DS_Store
+
+working/*
+dist/*

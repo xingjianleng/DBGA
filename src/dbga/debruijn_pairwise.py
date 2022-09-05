@@ -3,9 +3,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple, Set, Union
 from utils import *
 
-import click
 from cogent3.align import make_dna_scoring_dict
-from cogent3 import SequenceCollection, make_aligned_seqs
+from cogent3 import SequenceCollection
 
 
 class deBruijn:
@@ -539,59 +538,3 @@ class deBruijn:
         seq2_res.append(bubble_alignment[1])
 
         return {self.names[0]: "".join(seq1_res), self.names[1]: "".join(seq2_res)}
-
-
-@click.command()  # pragma: no cover
-@click.option(
-    "--infile", type=str, required=True, help="input unaligned sequences file"
-)
-@click.option(
-    "--outfile", type=str, required=True, help="output aligned file destination"
-)
-@click.option("--k", type=int, required=True, help="kmer size")
-@click.option(
-    "--moltype",
-    default="dna",
-    type=str,
-    required=False,
-    help="molecular type of sequences",
-)
-@click.option(
-    "--match",
-    default=10,
-    type=int,
-    required=False,
-    help="score for two matching nucleotide",
-)
-@click.option(
-    "--transition",
-    default=-1,
-    type=int,
-    required=False,
-    help="cost for DNA transition mutation",
-)
-@click.option(
-    "--transversion",
-    default=-8,
-    type=int,
-    required=False,
-    help="cost for DNA transversion mutation",
-)
-@click.option(
-    "--d", default=10, type=int, required=False, help="costs for opening a gap"
-)
-@click.option(
-    "--e", default=2, type=int, required=False, help="costs for extending a gap"
-)
-def cli(infile, outfile, k, moltype, match, transition, transversion, d, e):
-    dbg = deBruijn(infile, k, moltype)
-    aln = make_aligned_seqs(
-        dbg.alignment(match, transition, transversion, d, e), moltype=moltype
-    )
-    out_path = Path(outfile)
-    with open(f"{out_path.stem}_k{k}{out_path.suffix}", "w") as f:
-        f.write(aln.to_fasta())
-
-
-if __name__ == "__main__":  # pragma: no cover
-    cli()
