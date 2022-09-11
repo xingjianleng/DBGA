@@ -1,9 +1,8 @@
 from cogent3.align import make_dna_scoring_dict
 from cogent3.core.alphabet import AlphabetError
 from cogent3 import SequenceCollection
+from dbga.utils import *
 import pytest
-
-from src.utils import *
 
 
 def sequence_loader_checker(seqs, exp_seq1: str, exp_seq2: str):
@@ -34,7 +33,7 @@ def test_read_debruijn_edge_kmer():
 
 def test_load_sequences():
     # given a path, load sequences
-    path = "./tests/data/gap_at_end.fasta"
+    path = "data/gap_at_end.fasta"
     sequence_loader_checker(
         load_sequences(path, moltype="dna"), "GTACAAGCGATG", "GTACAAGCGA"
     )
@@ -59,7 +58,7 @@ def test_load_sequences():
 
     # if the provided path doesn't contain a file
     with pytest.raises(ValueError):
-        load_sequences("./tests/data/not_a_file", moltype="dna")
+        load_sequences("data/not_a_file", moltype="dna")
 
     # if the sequences contain characters that is not in alphabet, raise an error
     sequences = ["ACTGA", "TACGE"]

@@ -1,11 +1,9 @@
-from cogent3.format.fasta import alignment_to_fasta
+from dbga.debruijn_pairwise import *
 import pytest
-
-from src.debruijn_pairwise import *
 
 
 # checker for check the kmer length is satisfied
-def kmer_length_checker(debruijn: deBruijn):
+def kmer_length_checker(debruijn: deBruijnPairwise):
     for node in debruijn.nodes.values():
         if node.node_type not in [NodeType.start, NodeType.end]:
             assert len(node.kmer) == debruijn.k
@@ -18,7 +16,7 @@ def example_checker(seqs, k, exp_seq1_idx, exp_seq2_idx, exp_merge, exp_aln):
     exp_seq2 = exp_aln[1].replace("-", "")
 
     # all testing examples are DNA sequences
-    db = deBruijn(seqs, k, moltype="dna")
+    db = deBruijnPairwise(seqs, k, moltype="dna")
     # check kmer length
     kmer_length_checker(db)
     exp_start_idx = exp_seq1_idx[0], exp_seq2_idx[0]
@@ -53,7 +51,7 @@ def test_substitution_middle():
     seq1 = "GTACAAGCGA"
     seq2 = "GTACACGCGA"
     example_checker(
-        seqs="./tests/data/substitution_middle.fasta",
+        seqs="data/substitution_middle.fasta",
         k=3,
         exp_seq1_idx=list(range(10)),
         exp_seq2_idx=[10, 1, 2, 3, 11, 12, 13, 7, 8, 14],
@@ -67,7 +65,7 @@ def test_gap_bubble_duplicate():
     seq1 = "GTACACGTATG"
     seq2 = "GTACACG-ATG"
     example_checker(
-        seqs="./tests/data/gap_bubble_duplicate.fasta",
+        seqs="data/gap_bubble_duplicate.fasta",
         k=3,
         exp_seq1_idx=list(range(9)),
         exp_seq2_idx=[9, 1, 2, 3, 4, 10, 11, 7, 12],
@@ -81,7 +79,7 @@ def test_gap_at_end():
     seq1 = "GTACAAGCGATG"
     seq2 = "GTACAAGCGA--"
     example_checker(
-        seqs="./tests/data/gap_at_end.fasta",
+        seqs="data/gap_at_end.fasta",
         k=3,
         exp_seq1_idx=list(range(12)),
         exp_seq2_idx=[12, 1, 2, 3, 4, 5, 6, 7, 8, 13],
@@ -95,7 +93,7 @@ def test_gap_at_start():
     seq1 = "TGTACAAGCGA"
     seq2 = "-GTACAAGCGA"
     example_checker(
-        seqs="./tests/data/gap_at_start.fasta",
+        seqs="data/gap_at_start.fasta",
         k=3,
         exp_seq1_idx=list(range(11)),
         exp_seq2_idx=[11, 2, 3, 4, 5, 6, 7, 8, 9, 12],
@@ -109,7 +107,7 @@ def test_bubble_consecutive_duplicate():
     seq1 = "TGTACTGTAGA"
     seq2 = "TGTACTATAGA"
     example_checker(
-        seqs="./tests/data/bubble_consecutive_duplicate.fasta",
+        seqs="data/bubble_consecutive_duplicate.fasta",
         k=3,
         exp_seq1_idx=list(range(7)),
         exp_seq2_idx=[7, 1, 2, 8, 9, 10, 4, 5, 11],
@@ -123,7 +121,7 @@ def test_duplicate_unbalanced_end():
     seq1 = "TGTACGTCAATGTCG"
     seq2 = "TGTAAGTCAATG---"
     example_checker(
-        seqs="./tests/data/duplicate_unbalanced_end.fasta",
+        seqs="data/duplicate_unbalanced_end.fasta",
         k=3,
         exp_seq1_idx=list(range(11)),
         exp_seq2_idx=[11, 1, 12, 13, 14, 5, 6, 7, 8, 15],
@@ -138,7 +136,7 @@ def test_unbalanced_end_w_duplicate():
     seq1 = "TGTACGTCAATGTCG"
     seq2 = "TGTAAGTCAATGT--"
     example_checker(
-        seqs="./tests/data/unbalanced_end_w_duplicate.fasta",
+        seqs="data/unbalanced_end_w_duplicate.fasta",
         k=3,
         exp_seq1_idx=list(range(11)),
         exp_seq2_idx=[11, 1, 12, 13, 14, 5, 6, 7, 8, 15],
@@ -153,7 +151,7 @@ def test_duplicate_kmer_in_bubble():
     seq1 = "TAC-ACGTAAT"
     seq2 = "TACGACG-AAT"
     example_checker(
-        seqs="./tests/data/duplicate_kmer_in_bubble.fasta",
+        seqs="data/duplicate_kmer_in_bubble.fasta",
         k=3,
         exp_seq1_idx=list(range(9)),
         exp_seq2_idx=[9, 1, 10, 11, 7, 12],
@@ -168,7 +166,7 @@ def test_both_end_duplicate():
     seq1 = "ACGTGACG"
     seq2 = "ACTTGACG"
     example_checker(
-        seqs="./tests/data/both_end_duplicate.fasta",
+        seqs="data/both_end_duplicate.fasta",
         k=3,
         exp_seq1_idx=list(range(6)),
         exp_seq2_idx=[6, 7, 8, 9, 3, 4, 10],
@@ -182,7 +180,7 @@ def test_unrelated_sequences():
     seq1 = "ACGT--AGTATC"
     seq2 = "ACCTACAGCA--"
     example_checker(
-        seqs="./tests/data/unrelated_sequences.fasta",
+        seqs="data/unrelated_sequences.fasta",
         k=3,
         exp_seq1_idx=list(range(8)),
         exp_seq2_idx=list(range(8, 18)),
@@ -196,7 +194,7 @@ def test_edge_case1():
     seq1 = "TACCACGTAAT"
     seq2 = "TACGACCTAAT"
     with pytest.raises(ValueError) as e:
-        deBruijn([seq1, seq2], k=3, moltype="dna")
+        deBruijnPairwise([seq1, seq2], k=3, moltype="dna")
         assert (
             e.value
             == "Cycles detected in de Bruijn graph, usually caused by small kmer sizes"
@@ -208,7 +206,7 @@ def test_edge_case2():
     seq1 = "TACCGTCCAGACGTAAT"
     seq2 = "TACGGTCCAGACCTAAT"
     with pytest.raises(ValueError) as e:
-        deBruijn([seq1, seq2], k=3, moltype="dna")
+        deBruijnPairwise([seq1, seq2], k=3, moltype="dna")
         assert (
             e.value
             == "Cycles detected in de Bruijn graph, usually caused by small kmer sizes"

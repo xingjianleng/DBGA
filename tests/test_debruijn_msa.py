@@ -1,6 +1,5 @@
+from dbga.debruijn_msa import *
 import pytest
-
-from src.debruijn_msa import *
 
 
 # checker for check the kmer length is satisfied
@@ -26,7 +25,7 @@ def msa_three_seqs_checker(seqs, k, exp_seqs_idx, exp_merge, exp_aln):
         assert db.seq_node_idx[i] == exp_seqs_idx[i]
 
     # two aligned sequences should have the same length
-    aln_result = db.alignment()
+    aln_result = db.alignment().to_dict()
 
     assert aln_result == {f"seq{i + 1}": exp_aln[i] for i in range(db.num_seq)}
 
@@ -39,7 +38,7 @@ def test_msa_example1():
     seq2 = "ACATGACAGCT"
     seq3 = "ACTTGACACGT"
     msa_three_seqs_checker(
-        seqs="./tests/data/msa_example1.fasta",
+        seqs="data/msa_example1.fasta",
         k=3,
         exp_seqs_idx=[
             list(range(10)),
@@ -56,7 +55,7 @@ def test_msa_example2_not_optimal():
     seq2 = "GTAATTGCCT--CGAGA"
     seq3 = "GTAATTGCCACGCGA--"
     msa_three_seqs_checker(
-        seqs="./tests/data/msa_example2.fasta",
+        seqs="data/msa_example2.fasta",
         k=3,
         exp_seqs_idx=[
             list(range(15)),
@@ -73,7 +72,7 @@ def test_msa_example2_success():
     seq2 = "GTAATTGCCTCGAGA"
     seq3 = "GTAATTGCCACGCGA"
     msa_three_seqs_checker(
-        seqs="./tests/data/msa_example2.fasta",
+        seqs="data/msa_example2.fasta",
         k=4,
         exp_seqs_idx=[
             list(range(14)),
@@ -87,7 +86,7 @@ def test_msa_example2_success():
 
 def test_msa_example3_fail():
     with pytest.raises(ValueError) as e:
-        deBruijnMultiSeqs("./tests/data/msa_example3.fasta", k=3, moltype="dna")
+        deBruijnMultiSeqs("data/msa_example3.fasta", k=3, moltype="dna")
         assert (
             e.value
             == "Cycles detected in de Bruijn graph, usually caused by small kmer sizes"
@@ -99,7 +98,7 @@ def test_msa_example3_success():
     seq2 = "TACGGTCCAGACCTAAT"
     seq3 = "TACGGTCCAGACCTAAT"
     msa_three_seqs_checker(
-        seqs="./tests/data/msa_example3.fasta",
+        seqs="data/msa_example3.fasta",
         k=4,
         exp_seqs_idx=[
             list(range(16)),
@@ -116,7 +115,7 @@ def test_msa_example4():
     seq2 = "GTACAAGCGA--"
     seq3 = "GTAC-AGCGATG"
     msa_three_seqs_checker(
-        seqs="./tests/data/msa_example4.fasta",
+        seqs="data/msa_example4.fasta",
         k=3,
         exp_seqs_idx=[
             list(range(12)),
