@@ -20,6 +20,7 @@ classifiers = [
         "Topic :: Software Development :: Libraries :: Python Modules",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
     ]
 # the following are inferred from the source code
 dynamic = ["version", "description"]
@@ -39,7 +40,6 @@ master = [
     "flit",
     "graphviz",
     "isort",
-    "numpy",
     "pandas",
     "plotly",
     "pytest",
