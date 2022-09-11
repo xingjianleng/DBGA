@@ -7,24 +7,30 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
-
+  tests:
+    name: "Python ${{ matrix.python-version }}"
     runs-on: ${{ matrix.os }}
+
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [macos-latest, ubuntu-latest, windows-latest]
         python-version: ["3.8", "3.9", "3.10"]
 
     steps:
-    - uses: "actions/setup-python@v2"
-      with:
-        python-version: "${{ matrix.python-version }}"
+      - uses: "actions/checkout@v2"
+        with:
+          fetch-depth: 0
 
-    - name: "Installs for ${{ matrix.python-version }}"
-      run: |
-        python --version
-        pip install --upgrade pip wheel setuptools flit
-        pip install --upgrade nox
+      # Setup env
+      - uses: "actions/setup-python@v2"
+        with:
+            python-version: "${{ matrix.python-version }}"
 
-    - name: "Run nox for ${{ matrix.python-version }}"
-      run: "nox -s test-${{ matrix.python-version }}"
+      - name: "Installs for ${{ matrix.python-version }}"
+        run: |
+          python --version
+          pip install --upgrade pip wheel setuptools flit
+          pip install --upgrade nox
+
+      - name: "Run nox for ${{ matrix.python-version }}"
+        run: "nox -s test-${{ matrix.python-version }}"

@@ -10,7 +10,7 @@ authors = [
 keywords = ["biology", "genomics", "pairwise sequence alignment", "multiple sequence alignment"]
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.9"
+requires-python = ">=3.8"
 dependencies = ["click", "numpy"]
 classifiers = [
         "Development Status :: 5 - Production/Stable",
@@ -19,6 +19,7 @@ classifiers = [
         "Topic :: Scientific/Engineering :: Bio-Informatics",
         "Topic :: Software Development :: Libraries :: Python Modules",
         "Operating System :: OS Independent",
+        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
     ]
@@ -53,7 +54,7 @@ testpaths = "tests"
 
 [tool.black]
 line-length = 88
-target-version = ["py39"]
+target-version = ["py38"]
 exclude = '''
 /(
     \.eggs

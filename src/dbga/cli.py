@@ -84,7 +84,7 @@ from dbga.debruijn_pairwise import deBruijnPairwise
     default=0.01,
     help="One parameter for the progressive pair-HMM (MSA only)",
 )
-def debruijn_align_main(
+def main(
     infile,
     outfile,
     k,
@@ -159,4 +159,4 @@ def debruijn_align_main(
 
 
 if __name__ == "__main__":
-    debruijn_align_main()
+    main()
