@@ -1,4 +1,3 @@
-import click
 from collections import Counter
 from cogent3 import load_unaligned_seqs
 from pathlib import Path
@@ -26,24 +25,3 @@ def calculate_k(path: Path, thresh: int, moltype: str):
             current_k += 1
 
     return current_k
-
-
-@click.command()
-@click.option(
-    "--infile", type=str, required=True, help="input unaligned sequences file"
-)
-@click.option(
-    "--thresh",
-    type=float,
-    default=0.001,
-    required=False,
-    help="Proportion of duplicate kmers im each sequence, by default 0.001",
-)
-def cli(infile, thresh):
-    path = Path(infile).expanduser().absolute()
-    k = calculate_k(path=path, thresh=thresh, moltype="dna")
-    print(f"The smallest k value for only {thresh * 100}% duplicate kmers: {k}")
-
-
-if __name__ == "__main__":
-    cli()

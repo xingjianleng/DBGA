@@ -1,13 +1,13 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Set, Union
-from utils import *
 
 from cogent3.align import make_dna_scoring_dict
-from cogent3 import SequenceCollection
+from cogent3 import SequenceCollection, make_aligned_seqs
+from dbga.utils import *
 
 
-class deBruijn:
+class deBruijnPairwise:
     """The de Bruijn graph class, with construction, visualization and alignment
 
     Attributes
@@ -53,7 +53,7 @@ class deBruijn:
         -------
 
         """
-        sc: SequenceCollection = load_sequences(data=data, moltype=moltype)
+        self.sc: SequenceCollection = load_sequences(data=data, moltype=moltype)
         self.id_count = 0
         self.k = k
         self.nodes: Dict[int, Node] = {}
@@ -62,8 +62,8 @@ class deBruijn:
         self.merge_node_idx: List[int] = []
         self.seq_last_kmer_idx: List[int] = []
         self.moltype: str = moltype
-        self.names: Tuple[Any, ...] = tuple(sc.names)
-        self.sequences: Tuple[str, ...] = tuple([str(seq) for seq in sc.seqs])
+        self.names: Tuple[Any, ...] = tuple(self.sc.names)
+        self.sequences: Tuple[str, ...] = tuple([str(seq) for seq in self.sc.seqs])
         self.num_seq: int = len(self.sequences)
         # calculate the average sequences length
         self.avg_len = sum(map(len, self.sequences)) / self.num_seq
@@ -537,4 +537,11 @@ class deBruijn:
         seq1_res.append(bubble_alignment[0])
         seq2_res.append(bubble_alignment[1])
 
-        return {self.names[0]: "".join(seq1_res), self.names[1]: "".join(seq2_res)}
+        seq1_aln = "".join(seq1_res)
+        seq2_aln = "".join(seq2_res)
+        if len(seq1_aln) != len(seq2_aln):
+            raise ValueError(
+                "Incorrect sequence alignment lenghth generated, usually caused by small kmer sizes"
+            )
+
+        return make_aligned_seqs({self.names[0]: seq1_aln, self.names[1]: seq2_aln})

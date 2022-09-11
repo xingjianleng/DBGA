@@ -1,18 +1,17 @@
-from debruijn_pairwise import deBruijn
+from dbga.debruijn_pairwise import deBruijnPairwise
 import math
 from typing import Any, Tuple, List, Union
-from utils import (
+
+from cogent3.align import make_dna_scoring_dict
+from cogent3.core.sequence import DnaSequence
+from cogent3.format.fasta import alignment_to_fasta
+from cogent3.maths.stats.number import CategoryCounter
+from dbga.utils import (
     dna_global_aln,
     load_sequences,
     NodeType,
     predict_final_p,
 )
-
-import click
-from cogent3.align import make_dna_scoring_dict
-from cogent3.core.sequence import DnaSequence
-from cogent3.format.fasta import alignment_to_fasta
-from cogent3.maths.stats.number import CategoryCounter
 
 
 def get_closest_odd(num: int, upper: bool):
@@ -152,7 +151,7 @@ def adpt_dbg_alignment_recursive(
         return dna_global_aln(*seqs, s, d, e)
 
     # 2. Construct de Bruijn graph with sequences and k
-    dbg = deBruijn(seqs, k, moltype="dna")
+    dbg = deBruijnPairwise(seqs, k, moltype="dna")
     # print(len(dbg.merge_node_idx))
     # print("-----\n\n\n")
 

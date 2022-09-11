@@ -2,9 +2,9 @@ from __future__ import annotations
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Set, Union
-from utils import *
 
-from cogent3 import SequenceCollection
+from cogent3 import SequenceCollection, make_aligned_seqs
+from dbga.utils import *
 
 
 class deBruijnMultiSeqs:
@@ -55,7 +55,7 @@ class deBruijnMultiSeqs:
         -------
 
         """
-        sc: SequenceCollection = load_sequences(data=data, moltype=moltype)
+        self.sc: SequenceCollection = load_sequences(data=data, moltype=moltype)
         self.id_count = 0
         self.k = k
         self.nodes: Dict[int, Node] = {}
@@ -65,8 +65,8 @@ class deBruijnMultiSeqs:
         self.merge_node_idx_temp: List[int] = []
         self.seq_last_kmer_idx: List[int] = []
         self.moltype: str = moltype
-        self.names: Tuple[Any, ...] = tuple(sc.names)
-        self.sequences: Tuple[str, ...] = tuple([str(seq) for seq in sc.seqs])
+        self.names: Tuple[Any, ...] = tuple(self.sc.names)
+        self.sequences: Tuple[str, ...] = tuple([str(seq) for seq in self.sc.seqs])
         self.num_seq: int = len(self.sequences)
         # calculate the average sequences length
         self.avg_len = sum(map(len, self.sequences)) / self.num_seq
@@ -546,4 +546,7 @@ class deBruijnMultiSeqs:
                 "Incorrect multiple sequence alignment generated, usually caused by small kmer sizes"
             )
 
-        return {name: "".join(aln[i]) for i, name in enumerate(self.names)}
+        return make_aligned_seqs(
+            {name: aln_str[i] for i, name in enumerate(self.names)},
+            moltype=self.moltype,
+        )

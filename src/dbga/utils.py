@@ -277,7 +277,7 @@ def debruijn_merge_correctness(
         return True
 
 
-def to_DOT(nodes: List[Node]) -> graphviz.Digraph:
+def to_DOT(nodes: List[Node]) -> graphviz.Digraph:  # pragma: no cover
     """Obtain the DOT representation to the de Bruijn graph
 
     Parameters
@@ -305,7 +305,7 @@ def to_DOT(nodes: List[Node]) -> graphviz.Digraph:
     return dot
 
 
-def predict_p(seqs: SequenceCollection, k: int) -> float:
+def predict_p(seqs: SequenceCollection, k: int) -> float:  # pragma: no cover
     """predict similarity for of two sequences with the k size given using IoU of kmers
 
     Parameters
@@ -331,7 +331,7 @@ def predict_p(seqs: SequenceCollection, k: int) -> float:
     return p
 
 
-def predict_final_p(seqs: SequenceCollection) -> float:
+def predict_final_p(seqs: SequenceCollection) -> float:  # pragma: no cover
     """estimate the general similarity between two sequences using IoU of kmers
 
     Parameters
@@ -349,7 +349,7 @@ def predict_final_p(seqs: SequenceCollection) -> float:
     return min([p for p in (predict_p(seqs, k) for k in range(min_k, max_k))])
 
 
-def tree_prediction(seq_sc: SequenceCollection) -> Any:
+def tree_prediction(seq_sc: SequenceCollection) -> Any:  # pragma: no cover
     """generate the estimated tree for input sequences using the predicted pairwise similarity
 
     Parameters
