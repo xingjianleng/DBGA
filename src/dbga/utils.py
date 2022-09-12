@@ -236,10 +236,12 @@ def dna_msa(
         # case where only one sequence is not empty
         return seqs_not_non.add_seqs(seqs_non)
     else:
+        # some sequence not null
+        # NOTE: tree parameter is not passed, since some sequences in
+        # tree don't exist in the SequenceCollection
         aln, _ = TreeAlign(
             model=model,
             seqs=seqs_not_non,
-            tree=tree,
             indel_rate=indel_rate,
             indel_length=indel_length,
         )
