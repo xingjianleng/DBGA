@@ -193,7 +193,7 @@ def dna_global_aln(
 def dna_msa(
     seqs: SequenceCollection,
     model: str = "F81",
-    tree: Any = None,
+    dm: Any = None,
     indel_rate: float = 0.01,
     indel_length: float = 0.01,
 ) -> SequenceCollection:
@@ -205,8 +205,8 @@ def dna_msa(
         the SequenceCollection object of all sequences that need to be aligned
     model : str, optional
         a substitution model or the name of one, see cogent3.available_models(), by default "F81"
-    tree : Any, optinal
-        a guide tree for multiple sequence alignment, by default None
+    dm : Any, optinal
+        a distance matrix between each input sequences, by default None
     indel_rate : float, optional
         one parameter for the progressive pair-HMM, by default 0.01
     indel_length : float, optional
@@ -217,36 +217,46 @@ def dna_msa(
     SequenceCollection
         the SequenceCollection representation of the multiple-sequence alignment result
     """
-    seqs_not_non = seqs.take_seqs_if(lambda seq: len(seq) > 0)
-    seqs_non = seqs.take_seqs_if(lambda seq: len(seq) > 0, negate=True)
-    if type(seqs_non) == dict:
-        # all sequences not null
+    seqs_not_null = seqs.take_seqs_if(lambda seq: len(seq) > 0)
+    seqs_null = seqs.take_seqs_if(lambda seq: len(seq) > 0, negate=True)
+    if type(seqs_null) == dict:
+        # all sequences not null, construct a tree using distance matrix
+        if dm is None:
+            tree = None
+        else:
+            tree = dm.quick_tree()
+
         aln, _ = TreeAlign(
             model=model,
-            seqs=seqs_not_non,
+            seqs=seqs_not_null,
             tree=tree,
             indel_rate=indel_rate,
             indel_length=indel_length,
         )
         return aln
-    elif type(seqs_not_non) == dict:
+    elif type(seqs_not_null) == dict:
         # case where all sequences is empty
         return seqs
-    elif seqs_not_non.num_seqs == 1:
+    elif seqs_not_null.num_seqs == 1:
         # case where only one sequence is not empty
-        return seqs_not_non.add_seqs(seqs_non)
+        return seqs_not_null.add_seqs(seqs_null)
     else:
-        # some sequence not null
-        # NOTE: tree parameter is not passed, since some sequences in
-        # tree don't exist in the SequenceCollection
+        # some sequence not null, make tree with the not null sequences
+        if dm is None:
+            tree = None
+        else:
+            dm_subset = dm.take_dists(seqs_not_null.names)
+            tree = dm_subset.quick_tree()
+
         aln, _ = TreeAlign(
             model=model,
-            seqs=seqs_not_non,
+            seqs=seqs_not_null,
+            tree=tree,
             indel_rate=indel_rate,
             indel_length=indel_length,
         )
         seqs_non_sc = make_unaligned_seqs(
-            {name: aln.seq_len * "-" for name in seqs_non.names}, moltype=seqs.moltype
+            {name: aln.seq_len * "-" for name in seqs_null.names}, moltype=seqs.moltype
         )
         return aln.add_seqs(seqs_non_sc)
 
@@ -351,8 +361,8 @@ def predict_final_p(seqs: SequenceCollection) -> float:  # pragma: no cover
     return min([p for p in (predict_p(seqs, k) for k in range(min_k, max_k))])
 
 
-def tree_prediction(seq_sc: SequenceCollection) -> Any:  # pragma: no cover
-    """generate the estimated tree for input sequences using the predicted pairwise similarity
+def distance_matrix_prediction(seq_sc: SequenceCollection) -> Any:  # pragma: no cover
+    """generate the estimated distance matrix for input sequences using the predicted pairwise similarity
 
     Parameters
     ----------
@@ -362,7 +372,7 @@ def tree_prediction(seq_sc: SequenceCollection) -> Any:  # pragma: no cover
     Returns
     -------
     Any
-        the estimated tree using the predicted pairwise similarity
+        the estimated distance matrix using the predicted pairwise similarity
     """
     dist_dict = {}
     for seq_name1, seq_name2 in combinations(seq_sc.names, r=2):
@@ -371,8 +381,7 @@ def tree_prediction(seq_sc: SequenceCollection) -> Any:  # pragma: no cover
         dist_dict[(seq_name1, seq_name2)] = distance
         dist_dict[(seq_name2, seq_name1)] = distance
     dm = DistanceMatrix(dist_dict)
-    tree = dm.quick_tree(True)
-    return tree
+    return dm
 
 
 # NodeType class to indicate the type of node (start/middle/end)

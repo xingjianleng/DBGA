@@ -2,7 +2,7 @@ from pathlib import Path
 from time import time
 
 import click
-from dbga.utils import load_sequences, tree_prediction, load_sequences
+from dbga.utils import load_sequences, distance_matrix_prediction
 from dbga.debruijn_msa import deBruijnMultiSeqs
 from dbga.debruijn_pairwise import deBruijnPairwise
 
@@ -114,6 +114,7 @@ def main(
     sequence_collection = load_sequences(data=infile_path, moltype=moltype)
     sequence_num = sequence_collection.num_seqs
     start_time = time()
+
     if sequence_num < 2:
         # too few sequences
         click.secho(
@@ -141,10 +142,11 @@ def main(
             fg="green",
         )
         dbg = deBruijnMultiSeqs(data=sequence_collection, k=k, moltype=moltype)
-        estimated_tree = tree_prediction(dbg.sc)
+        estimated_dm = distance_matrix_prediction(dbg.sc)
+
         aln = dbg.alignment(
-            tree=estimated_tree,
             model=model,
+            dm=estimated_dm,
             indel_rate=indel_rate,
             indel_length=indel_length,
         )

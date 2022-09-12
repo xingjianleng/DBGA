@@ -358,7 +358,7 @@ class deBruijnMultiSeqs:
         bubble_indices: List[List[int]],
         prev_edge_reads: List[str],
         model: str = "F81",
-        tree: Any = None,
+        dm: Any = None,
         indel_rate: float = 0.01,
         indel_length: float = 0.01,
         prev_merge: str = "",
@@ -374,6 +374,8 @@ class deBruijnMultiSeqs:
             the edge kmer from the edge of the last merge node for each sequence
         model : str, optional
             a substitution model or the name of one, see cogent3.available_models(), by default "F81"
+        dm : Any, optional
+            a distance matrix between each input sequences, by default None
         indel_rate : float, optional
             one parameter for the progressive pair-HMM, by default 0.01
         indel_length : float, optional
@@ -400,7 +402,7 @@ class deBruijnMultiSeqs:
         aln = dna_msa(
             seqs=seqs_sc,
             model=model,
-            tree=tree,
+            dm=dm,
             indel_rate=indel_rate,
             indel_length=indel_length,
         )
@@ -432,7 +434,7 @@ class deBruijnMultiSeqs:
     def alignment(
         self,
         model: str = "F81",
-        tree: Any = None,
+        dm: Any = None,
         indel_rate: float = 0.01,
         indel_length: float = 0.01,
     ) -> str:
@@ -442,8 +444,8 @@ class deBruijnMultiSeqs:
         ----------
         model : str
             a substitution model or the name of one, see cogent3.available_models()
-        tree : Any, optinal
-            a guide tree for multiple sequence alignment, by default None
+        dm : Any, optinal
+            a distance matrix between each input sequences, by default None
         indel_rate : float
             one parameter for the progressive pair-HMM, by default 0.01
         indel_length : float
@@ -494,7 +496,7 @@ class deBruijnMultiSeqs:
                     bubble_indices=bubble_indices,
                     prev_edge_reads=merge_edge_read,
                     model=model,
-                    tree=tree,
+                    dm=dm,
                     indel_rate=indel_rate,
                     indel_length=indel_length,
                     prev_merge=prev_merge_str,
@@ -531,7 +533,7 @@ class deBruijnMultiSeqs:
             bubble_indices=bubble_indices,
             prev_edge_reads=merge_edge_read,
             model=model,
-            tree=tree,
+            dm=dm,
             indel_rate=indel_rate,
             indel_length=indel_length,
             prev_merge="",
