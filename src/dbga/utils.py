@@ -10,7 +10,7 @@ from cogent3.align import global_pairwise
 from cogent3.align.progressive import TreeAlign
 from cogent3.evolve.fast_distance import DistanceMatrix
 from cogent3 import load_unaligned_seqs, make_unaligned_seqs
-from cogent3 import SequenceCollection
+from cogent3 import SequenceCollection, ArrayAlignment
 import graphviz
 
 
@@ -383,6 +383,103 @@ def distance_matrix_prediction(seq_sc: SequenceCollection) -> Any:  # pragma: no
         dist_dict[(seq_name2, seq_name1)] = distance
     dm = DistanceMatrix(dist_dict)
     return dm
+
+
+def pairwise_alignment_score(seqs: ArrayAlignment) -> Dict[str, int]:
+    """alignment score of two sequences using SOP (sum of pairs)
+
+    Parameters
+    ----------
+    seqs : ArrayAlignment
+        the ArrayAlignment object containing `two` aligned sequences 
+
+    Returns
+    -------
+    Dict[str, int]
+        the mapping of alignment attribute to the statistics
+    """
+    # seqs should contain exactly two sequences
+    assert seqs.num_seqs == len(seqs.seqs) == 2
+    rtn = {
+        "match": 0,
+        "mismatch": 0,
+        "gap_open": 0,
+        "gap_extend": 0,
+    }
+    seq1_gap_opened, seq2_gap_opened = False, False
+
+    for i in range(seqs.seq_len):
+        seq1_char = seqs.seqs[0][i]
+        seq2_char = seqs.seqs[1][i]
+        # exclude cases where there is a match, or both gaps
+        if seq1_char != seq2_char :
+            if seq1_char != "-" and seq2_char != "-":
+                # two different nucleotides
+                rtn["mismatch"] += 1
+                seq1_gap_opened = False
+                seq2_gap_opened = False
+            elif (seq1_char == "-" and seq1_gap_opened) or (seq2_char == "-" and seq2_gap_opened):
+                # extending a current gap
+                rtn["gap_extend"] += 1
+            elif seq1_char == "-" and seq2_gap_opened:
+                # end gap in seq2, start a gap in seq1
+                rtn["gap_open"] += 1
+                seq1_gap_opened = True
+                seq2_gap_opened = False
+            elif seq2_char == "-" and seq1_gap_opened:
+                # end a gap in seq1, start a gap in seq2
+                rtn["gap_open"] += 1
+                seq1_gap_opened = False
+                seq2_gap_opened = True
+            elif seq1_char == "-":
+                # open a gap in seq1 (one gap, one nucleotide)
+                rtn["gap_open"] += 1
+                seq1_gap_opened = True
+            elif seq2_char == "-":
+                # open a gap in seq2 (one gap, one nucleotide)
+                rtn["gap_open"] += 1
+                seq2_gap_opened = True
+        elif seq1_char != "-":
+            # two matching nucleotides
+            rtn["match"] += 1
+            seq1_gap_opened = False
+            seq2_gap_opened = False
+        else:
+            # two gaps
+            seq1_gap_opened = False
+            seq2_gap_opened = False
+
+    return rtn
+
+
+def sop(seqs: ArrayAlignment) -> Dict[str, int]:
+    """sop stands for sum of pairs, function for measuring alignment quality for multiple sequence alignment
+
+    Parameters
+    ----------
+    seqs : ArrayAlignment
+        the ArrayAlignment object with two or more aligned sequences
+
+    Returns
+    -------
+    Dict[str, int]
+        the mapping of alignment attribute to the statistics
+    """
+    rtn = {
+        "match": 0,
+        "mismatch": 0,
+        "gap_open": 0,
+        "gap_extend": 0,
+    }
+
+    for chosen in combinations(seqs.names, 2):
+        sub_seqs = seqs.take_seqs(chosen)
+        sub_seqs_sop = pairwise_alignment_score(sub_seqs)
+        print(sub_seqs_sop)
+        for key, value in sub_seqs_sop.items():
+            rtn[key] += value
+
+    return rtn
 
 
 # NodeType class to indicate the type of node (start/middle/end)
