@@ -377,7 +377,8 @@ def distance_matrix_prediction(seq_sc: SequenceCollection) -> Any:  # pragma: no
     dist_dict = {}
     for seq_name1, seq_name2 in combinations(seq_sc.names, r=2):
         sub_seqs = seq_sc.take_seqs((seq_name1, seq_name2))
-        distance = 1 - predict_final_p(sub_seqs)
+        k_estimated = math.ceil(math.log(min(map(len, sub_seqs.seqs)), 4)) + 2
+        distance = 1 - predict_p(sub_seqs, k=k_estimated)
         dist_dict[(seq_name1, seq_name2)] = distance
         dist_dict[(seq_name2, seq_name1)] = distance
     dm = DistanceMatrix(dist_dict)
