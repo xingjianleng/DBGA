@@ -1,6 +1,6 @@
 from cogent3.align import make_dna_scoring_dict
 from cogent3.core.alphabet import AlphabetError
-from cogent3 import SequenceCollection
+from cogent3 import SequenceCollection, make_aligned_seqs
 from dbga.utils import *
 import pytest
 
@@ -147,6 +147,66 @@ def test_duplicate_kmers():
     # find duplicate kmers test 2
     kmer_lst2 = [["AG", "CT", "CA", "AG", "CT"], ["CT", "AG", "CT", "AG", "AC"]]
     assert duplicate_kmers(kmer_lst2) == {"AG", "CT"}
+
+
+def test_sop():
+    # 1. pairwise alignment case 1
+    seqs = make_aligned_seqs({
+        "seq1": "AGTCCAGTGA",
+        "seq2": "A--C-ATGGA"
+    }, moltype="dna")
+    pairs = sop(seqs)
+    exp_dict = {
+        "match": 5,
+        "mismatch": 2,
+        "gap_open": 2,
+        "gap_extend": 1,
+    }
+    assert pairs == exp_dict
+
+    # 2. pairwise alignment case 2
+    seqs = make_aligned_seqs({
+        "seq1": "AACTTCTTCGTGT",
+        "seq2": "AAC--C--CGTGT",
+    }, moltype="dna")
+    pairs = sop(seqs)
+    exp_dict = {
+        "match": 9,
+        "mismatch": 0,
+        "gap_open": 2,
+        "gap_extend": 2,
+    }
+    assert pairs == exp_dict
+
+    # 3. multiple sequence alignment case 1
+    seqs = make_aligned_seqs({
+        "seq1": "AACTTCTTCGTGT",
+        "seq2": "AAC--C--CGTGT",
+        "seq3": "AAC-----CGTGT",
+    }, moltype="dna")
+    pairs = sop(seqs)
+    exp_dict = {
+        "match": 25,
+        "mismatch": 0,
+        "gap_open": 4,
+        "gap_extend": 6,
+    }
+    assert pairs == exp_dict
+
+    # 4. multiple sequence alignment case 2
+    seqs = make_aligned_seqs({
+        "seq1": "AAGTCGATGGTCA",
+        "seq2": "AAC-CCA---TGA",
+        "seq3": "ATCT---T--CCA",
+    }, moltype="dna")
+    pairs = sop(seqs)
+    exp_dict = {
+        "match": 14,
+        "mismatch": 9,
+        "gap_open": 7,
+        "gap_extend": 7,
+    }
+    assert pairs == exp_dict
 
 
 if __name__ == "__main__":
