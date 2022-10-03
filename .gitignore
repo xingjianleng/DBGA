@@ -1,7 +1,3 @@
-# Larger files
-data/*
-benchmark/*
-
 # tmp files and caches
 .coverage
 **/__pycache__
