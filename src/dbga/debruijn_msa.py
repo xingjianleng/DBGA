@@ -7,7 +7,7 @@ from cogent3 import SequenceCollection, make_aligned_seqs
 from dbga.utils import *
 
 
-class deBruijnMultiSeqs:
+class DeBruijnMultiSeqs:
     """The de Bruijn graph class, with construction, visualization and alignment
 
     Attributes

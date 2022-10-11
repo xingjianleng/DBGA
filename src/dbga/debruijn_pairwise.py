@@ -7,7 +7,7 @@ from cogent3 import SequenceCollection, make_aligned_seqs
 from dbga.utils import *
 
 
-class deBruijnPairwise:
+class DeBruijnPairwise:
     """The de Bruijn graph class, with construction, visualization and alignment
 
     Attributes
@@ -544,4 +544,4 @@ class deBruijnPairwise:
                 "Incorrect sequence alignment lenghth generated, usually caused by small kmer sizes"
             )
 
-        return make_aligned_seqs({self.names[0]: seq1_aln, self.names[1]: seq2_aln})
+        return make_aligned_seqs({self.names[0]: seq1_aln, self.names[1]: seq2_aln}, moltype=self.moltype)

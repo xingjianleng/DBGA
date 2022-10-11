@@ -1,4 +1,4 @@
-from dbga.debruijn_pairwise import deBruijnPairwise
+from dbga.debruijn_pairwise import DeBruijnPairwise
 import math
 from typing import Any, Tuple, List, Union
 
@@ -151,7 +151,7 @@ def adpt_dbg_alignment_recursive(
         return dna_global_aln(*seqs, s, d, e)
 
     # 2. Construct de Bruijn graph with sequences and k
-    dbg = deBruijnPairwise(seqs, k, moltype="dna")
+    dbg = DeBruijnPairwise(seqs, k, moltype="dna")
     # print(len(dbg.merge_node_idx))
     # print("-----\n\n\n")
 

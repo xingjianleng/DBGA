@@ -3,8 +3,8 @@ from time import time
 
 import click
 from dbga.utils import load_sequences, distance_matrix_prediction
-from dbga.debruijn_msa import deBruijnMultiSeqs
-from dbga.debruijn_pairwise import deBruijnPairwise
+from dbga.debruijn_msa import DeBruijnMultiSeqs
+from dbga.debruijn_pairwise import DeBruijnPairwise
 
 
 @click.command()
@@ -23,7 +23,7 @@ from dbga.debruijn_pairwise import deBruijnPairwise
     help="Output aligned sequences file",
 )
 @click.option(
-    "-k", type=int, required=True, help="The kmer size for constructing de Bruijn graph"
+    "-k", type=int, required=True, help="The kmer size for constructing De Bruijn graph"
 )
 @click.option(
     "--moltype", "-m", type=str, required=True, help="The input sequence molecular type"
@@ -125,10 +125,10 @@ def main(
     elif sequence_num == 2:
         # pairwise sequence alignment case
         click.secho(
-            f"Number of sequences: {sequence_num}, running de Bruijn pairwise alignment",
+            f"Number of sequences: {sequence_num}, running De Bruijn pairwise alignment",
             fg="green",
         )
-        dbg = deBruijnPairwise(data=sequence_collection, k=k, moltype=moltype)
+        dbg = DeBruijnPairwise(data=sequence_collection, k=k, moltype=moltype)
         aln = dbg.alignment(
             match=match, transition=transition, transversion=transversion, d=d, e=e
         )
@@ -138,10 +138,10 @@ def main(
     else:
         # multiple sequence alignment case
         click.secho(
-            f"Number of sequences: {sequence_num}, running de Bruijn multiple sequence alignment",
+            f"Number of sequences: {sequence_num}, running De Bruijn multiple sequence alignment",
             fg="green",
         )
-        dbg = deBruijnMultiSeqs(data=sequence_collection, k=k, moltype=moltype)
+        dbg = DeBruijnMultiSeqs(data=sequence_collection, k=k, moltype=moltype)
         estimated_dm = distance_matrix_prediction(dbg.sc)
 
         aln = dbg.alignment(
