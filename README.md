@@ -94,10 +94,16 @@ dbg.alignment()
 
 Output from above [Example1](#Example1)
 
-```
+```bash
 Number of sequences: 2, running De Bruijn pairwise alignment
 Alignment task finishes within 0.01 seconds!
 Alignment results saved in path/to/out.fasta!
+
+cat out.fasta
+>seq1
+GTACAAGCGA
+>seq2
+GTACACGCGA
 ```
 
 Output from above [Example2](#Example2)
