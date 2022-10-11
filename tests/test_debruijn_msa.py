@@ -3,7 +3,7 @@ import pytest
 
 
 # checker for check the kmer length is satisfied
-def kmer_length_checker(debruijn: deBruijnMultiSeqs):
+def kmer_length_checker(debruijn: DeBruijnMultiSeqs):
     for node in debruijn.nodes.values():
         if node.node_type not in [NodeType.start, NodeType.end]:
             assert len(node.kmer) == debruijn.k
@@ -12,7 +12,7 @@ def kmer_length_checker(debruijn: deBruijnMultiSeqs):
 def msa_three_seqs_checker(seqs, k, exp_seqs_idx, exp_merge, exp_aln):
     exp_seqs = [exp_seq.replace("-", "") for exp_seq in exp_aln]
     # all testing examples are DNA sequences
-    db = deBruijnMultiSeqs(seqs, k, moltype="dna")
+    db = DeBruijnMultiSeqs(seqs, k, moltype="dna")
     # check kmer length
     kmer_length_checker(db)
 
@@ -86,7 +86,7 @@ def test_msa_example2_success():
 
 def test_msa_example3_fail():
     with pytest.raises(ValueError) as e:
-        deBruijnMultiSeqs("data/msa_example3.fasta", k=3, moltype="dna")
+        DeBruijnMultiSeqs("data/msa_example3.fasta", k=3, moltype="dna")
         assert (
             e.value
             == "Cycles detected in de Bruijn graph, usually caused by small kmer sizes"

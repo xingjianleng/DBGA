@@ -3,7 +3,7 @@ import pytest
 
 
 # checker for check the kmer length is satisfied
-def kmer_length_checker(debruijn: deBruijnPairwise):
+def kmer_length_checker(debruijn: DeBruijnPairwise):
     for node in debruijn.nodes.values():
         if node.node_type not in [NodeType.start, NodeType.end]:
             assert len(node.kmer) == debruijn.k
@@ -16,7 +16,7 @@ def example_checker(seqs, k, exp_seq1_idx, exp_seq2_idx, exp_merge, exp_aln):
     exp_seq2 = exp_aln[1].replace("-", "")
 
     # all testing examples are DNA sequences
-    db = deBruijnPairwise(seqs, k, moltype="dna")
+    db = DeBruijnPairwise(seqs, k, moltype="dna")
     # check kmer length
     kmer_length_checker(db)
     exp_start_idx = exp_seq1_idx[0], exp_seq2_idx[0]
@@ -194,7 +194,7 @@ def test_edge_case1():
     seq1 = "TACCACGTAAT"
     seq2 = "TACGACCTAAT"
     with pytest.raises(ValueError) as e:
-        deBruijnPairwise([seq1, seq2], k=3, moltype="dna")
+        DeBruijnPairwise([seq1, seq2], k=3, moltype="dna")
         assert (
             e.value
             == "Cycles detected in de Bruijn graph, usually caused by small kmer sizes"
@@ -206,7 +206,7 @@ def test_edge_case2():
     seq1 = "TACCGTCCAGACGTAAT"
     seq2 = "TACGGTCCAGACCTAAT"
     with pytest.raises(ValueError) as e:
-        deBruijnPairwise([seq1, seq2], k=3, moltype="dna")
+        DeBruijnPairwise([seq1, seq2], k=3, moltype="dna")
         assert (
             e.value
             == "Cycles detected in de Bruijn graph, usually caused by small kmer sizes"
