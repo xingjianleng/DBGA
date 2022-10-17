@@ -127,5 +127,21 @@ def test_msa_example4():
     )
 
 
+def test_msa_example5():
+    seq1 = "GTACACGCG"
+    seq2 = "GTACA-GCG"
+    seq3 = "GTACAAGCG"
+    msa_three_seqs_checker(
+        seqs="data/msa_example5.fasta",
+        k=3,
+        exp_seqs_idx=[
+            list(range(9)),
+            [9, 1, 2, 3, 10, 11, 7, 12],
+            [13, 1, 2, 3, 14, 15, 11, 7, 16],
+        ],
+        exp_merge=[1, 2, 3, 7],
+        exp_aln=(seq1, seq2, seq3)
+    )
+
 if __name__ == "__main__":
     pytest.main()
