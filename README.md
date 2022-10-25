@@ -6,13 +6,13 @@
 
 ### Dependencies
 
-DBGA installation requires Python 3.8 or newer. Additional libraries listed below are also required to run DBGA. They can be installed with `pip install -r requirements.txt`.
+DBGA installation requires Python 3.8 or newer. Additional libraries listed below are also required to run DBGA. They can be installed with `pip install .`.
 
-- [click](https://pypi.org/project/click/) - version 8.1.3
-- [cogent3](https://pypi.org/project/cogent3/) - version 2022.8.24a1
-- [graphviz](https://pypi.org/project/graphviz/) - version 0.20
-- [nox](https://pypi.org/project/nox/) - version 2022.8.7
-- [pytest](https://pypi.org/project/pytest/) - version 7.0.1
+- [click](https://pypi.org/project/click/)
+- [cogent3](https://pypi.org/project/cogent3/)
+- [graphviz](https://pypi.org/project/graphviz/)
+- [nox](https://pypi.org/project/nox/)
+- [pytest](https://pypi.org/project/pytest/)
 
 ### Installing DBGA
 
@@ -39,6 +39,15 @@ Use `flit` to install DBGA to current Python environment
 ```bash
 flit install -s
 ```
+
+## Run tests
+To run tests in the repository, simply install and run [nox](https://pypi.org/project/nox/) with the following commands to test across Python 3.8 to 3.10.
+
+```bash
+pip install nox
+nox
+```
+
 
 ## Usage
 

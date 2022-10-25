@@ -11,7 +11,14 @@ keywords = ["biology", "genomics", "pairwise sequence alignment", "multiple sequ
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.8"
-dependencies = ["click", "numpy"]
+dependencies = [
+    "cogent3 @ git+https://github.com/cogent3/cogent3.git@develop",
+    "click",
+    "graphviz",
+    "pytest",
+    "plotly",
+    "pytest-cov",
+]
 classifiers = [
         "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Science/Research",
@@ -32,21 +39,6 @@ exclude = ["doc/*.html"]
 
 [project.scripts]
 dbga = "dbga.cli:main"
-
-[project.optional-dependencies]
-master = [
-    "black",
-    "cogent3",
-    "docformatter",
-    "flit",
-    "graphviz",
-    "isort",
-    "pandas",
-    "plotly",
-    "pytest",
-    "pytest-cov",
-    "pytest-xdist"
-]
 
 [tool.pytest.ini_options]
 addopts = ["--strict-config", "-ra"]

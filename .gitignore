@@ -8,6 +8,8 @@
 .idea/*
 .DS_Store
 
+benchmark/*
+data/*
 working/*
 dist/*
 bin/*
