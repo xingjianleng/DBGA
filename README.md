@@ -40,14 +40,6 @@ Use `flit` to install DBGA to current Python environment
 flit install -s
 ```
 
-## Run tests
-To run tests in the repository, simply install and run [nox](https://pypi.org/project/nox/) with the following commands to test across Python 3.8 to 3.10.
-
-```bash
-pip install nox
-nox
-```
-
 
 ## Usage
 
@@ -121,3 +113,18 @@ Output from above [Example2](#Example2)
 seq1	GTACAAGCGA
 seq2	.....C....
 ```
+
+## Run tests
+
+To run tests in the repository, simply install and run [nox](https://pypi.org/project/nox/) with the following commands to test across Python 3.8 to 3.10.
+
+```bash
+pip install nox
+nox
+```
+
+**Note:** The adaptive de Bruijn graph alignment is only applicable to long sequences, so tests were not added for `adaptive_debruijn.py`.  The code in `datasampler.py` and `kmersize.py` were not tested as they were for development rather than part of the algorithms.
+
+## Benchmark
+
+The benchmark results and related datasets can be found at [Cloudstor](https://cloudstor.aarnet.edu.au/plus/s/l5k2v2rzS5axfRD).

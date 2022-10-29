@@ -304,6 +304,11 @@ def to_DOT(nodes: List[Node]) -> graphviz.Digraph:  # pragma: no cover
 
     """
     dot = graphviz.Digraph("de Bruijn graph")
+    # enforce monospace fonts
+    dot.graph_attr["fontname"] = "Courier New"
+    dot.node_attr["fontname"] = "Courier New"
+    dot.edge_attr["fontname"] = "Courier New"
+    dot.attr(rankdir="LR")
     for node in nodes:
         dot.node(str(node.id), f"{str(node.id)}.{node.kmer}")
     for node in nodes:
