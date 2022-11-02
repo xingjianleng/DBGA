@@ -1,12 +1,12 @@
-# DBGA: De Bruijn Graph Alignment Tool
+# DBGA: de Bruijn Graph Alignment Tool
 
-**DBGA** is a Python library with a command line interface (CLI) designed for closely-related sequence alignment. It is capable of both global pairwise and multiple sequence alignment. DBGA uses De Bruijn graphs with existing alignment algorithms to boost both time and memory efficiency for sequence alignment. 
+**DBGA** is a Python library with a command line interface (CLI) designed for closely-related sequence alignment. It is capable of both global pairwise and multiple sequence alignment. DBGA uses de Bruijn graphs with existing alignment algorithms to boost both time and memory efficiency for sequence alignment. 
 
 ##  Getting Started
 
 ### Dependencies
 
-DBGA installation requires Python 3.8 or newer. Additional libraries listed below are also required to run DBGA. They can be installed with `pip install .`.
+DBGA installation requires Python 3.8 or newer. Additional libraries listed below were used when implementing the DBGA library.
 
 - [click](https://pypi.org/project/click/)
 - [cogent3](https://pypi.org/project/cogent3/)
@@ -28,9 +28,19 @@ Change working directory to DBGA folder
 cd DBGA/
 ```
 
+#### User install
+
+Install the dbga package using `pip3`
+
+```
+pip3 install .
+```
+
+#### Developer install
+
 Install Python `flit` package for installing DBGA
 
-```bash
+```
 pip3 install flit
 ```
 
@@ -43,15 +53,15 @@ flit install -s
 
 ## Usage
 
-To run the command line interface, typing `python3 src/dbga/cli.py` in the terminal. 
+To run the command line interface, typing `dbga --help` in the terminal. 
 
 ```
-Usage: cli.py [OPTIONS]
+Usage: dbga [OPTIONS]
 
 Options:
   -i, --infile PATH       Input original sequences file  [required]
   -o, --outfile PATH      Output aligned sequences file  [required]
-  -k INTEGER              The kmer size for constructing De Bruijn graph
+  -k INTEGER              The kmer size for constructing de Bruijn graph
                           [required]
   -m, --moltype TEXT      The input sequence molecular type  [required]
   --match INTEGER         score for two matching nucleotide (pairwise only)
@@ -67,7 +77,7 @@ Options:
   --help                  Show this message and exit.
 ```
 
-Or, DBGA can be used directly as a Python package as shown in [Example Usage](#Example Usage) below.
+Or, DBGA can be used directly as a Python package shown in [Example Usage](#Example Usage) below.
 
 ## Example Usage
 
@@ -75,8 +85,8 @@ Or, DBGA can be used directly as a Python package as shown in [Example Usage](#E
 
 Use the command line interface
 
-```bash
-python3 src/dbga/cli.py -i tests/data/substitution_middle.fasta -o out.fasta -k 3 -m dna
+```
+dbga -i tests/data/substitution_middle.fasta -o out.fasta -k 3 -m dna
 ```
 
 ### Example2
@@ -96,7 +106,7 @@ dbg.alignment()
 Output from above [Example1](#Example1)
 
 ```bash
-Number of sequences: 2, running De Bruijn pairwise alignment
+Number of sequences: 2, running de Bruijn pairwise alignment
 Alignment task finishes within 0.01 seconds!
 Alignment results saved in path/to/out.fasta!
 
@@ -123,7 +133,7 @@ pip install nox
 nox
 ```
 
-**Note:** The adaptive de Bruijn graph alignment is only applicable to long sequences, so tests were not added for `adaptive_debruijn.py`.  The code in `datasampler.py` and `kmersize.py` were not tested as they were for development rather than part of the algorithms.
+**Note:** The code in `datasampler.py` and `kmersize.py` were not tested as they were not used in the algorithm implementation.
 
 ## Benchmark
 
