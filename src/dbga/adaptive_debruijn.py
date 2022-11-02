@@ -3,32 +3,15 @@ import math
 from typing import Any, Tuple, List, Union
 
 from cogent3.align import make_dna_scoring_dict
-from cogent3.core.sequence import DnaSequence
 from cogent3.format.fasta import alignment_to_fasta
-from cogent3.maths.stats.number import CategoryCounter
 from dbga.utils import (
     dna_global_aln,
+    get_closest_odd,
+    get_seqs_entropy,
     load_sequences,
     NodeType,
     predict_final_p,
 )
-
-
-def get_closest_odd(num: int, upper: bool):
-    if upper and num & 1 == 0:
-        return num + 1
-    elif not upper and num & 1 == 0:
-        return num - 1
-    else:
-        return num
-
-
-def get_seqs_entropy(seqs_collection):
-    seqs = [str(seq) for seq in seqs_collection.iter_seqs()]
-    seqs = DnaSequence("".join(seqs))
-    suggested_k = math.ceil(math.log(len(seqs), 4))
-    counts = CategoryCounter(seqs.iter_kmers(k=suggested_k))
-    return counts.entropy
 
 
 def adpt_dbg_alignment(
@@ -39,7 +22,7 @@ def adpt_dbg_alignment(
     transversion: int = -8,
     d: int = 10,
     e: int = 2,
-) -> str:
+) -> str:  # pragma: no cover
     """the function for adaptive de Bruijn alignment
 
     Parameters
@@ -139,21 +122,16 @@ def adpt_dbg_alignment_recursive(
     # Two versions for adaptive de Bruijn alignment
     # 1. Use brute-force, descend from large k to smaller k
     # 2. Use mathematics and statistics ways to analyse the similarity between sequences to choose k
-    # print(k_index, k_choice)
     if k_index < 0 or k_index > len(k_choice) - 1:
         return dna_global_aln(*seqs, s, d, e)
 
     k = k_choice[k_index]
-    # print(k_index)
-    # print(k)
     # Base case: When it's impossible to find the appropriate k, call cogent3 alignment
     if k <= 0 or k > min(map(len, seqs)):
         return dna_global_aln(*seqs, s, d, e)
 
     # 2. Construct de Bruijn graph with sequences and k
     dbg = DeBruijnPairwise(seqs, k, moltype="dna")
-    # print(len(dbg.merge_node_idx))
-    # print("-----\n\n\n")
 
     # Edge case: when there's no merge node in the de Bruijn graph, directly align
     # when there's only merge node in the graph, it might lead to infinite loop, so directly align
@@ -209,7 +187,6 @@ def adpt_dbg_alignment_recursive(
                         # if the next node isn't the end node, only add the single nucleotide
                         bubble_read_seq1.append(edge.duplicate_str[0])
             bubble_read_seq1 = "".join(bubble_read_seq1)
-            # print(bubble_read_seq1)
 
             # for sequence 2
             bubble_read_seq2 = [dbg.read_from_kmer(bubble2, 1)]
@@ -223,9 +200,8 @@ def adpt_dbg_alignment_recursive(
                         bubble_read_seq2.append(edge.duplicate_str)
                     else:
                         # if the next node isn't the end node, only add the single nucleotide
-                        bubble_read_seq2.append(edge.duplicate_str)
+                        bubble_read_seq2.append(edge.duplicate_str[0])
             bubble_read_seq2 = "".join(bubble_read_seq2)
-            # print(bubble_read_seq2)
 
             # add the bubble read of the merge nodes into alignments
             aln[0].append(bubble_read_seq1)
