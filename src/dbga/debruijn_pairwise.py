@@ -539,9 +539,5 @@ class DeBruijnPairwise:
 
         seq1_aln = "".join(seq1_res)
         seq2_aln = "".join(seq2_res)
-        if len(seq1_aln) != len(seq2_aln):
-            raise ValueError(
-                "Incorrect sequence alignment lenghth generated, usually caused by small kmer sizes"
-            )
 
         return make_aligned_seqs({self.names[0]: seq1_aln, self.names[1]: seq2_aln}, moltype=self.moltype)

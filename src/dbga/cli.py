@@ -23,7 +23,7 @@ from dbga.debruijn_pairwise import DeBruijnPairwise
     help="Output aligned sequences file",
 )
 @click.option(
-    "-k", type=int, required=True, help="The kmer size for constructing De Bruijn graph"
+    "-k", type=int, required=True, help="The kmer size for constructing de Bruijn graph"
 )
 @click.option(
     "--moltype", "-m", type=str, required=True, help="The input sequence molecular type"
@@ -125,7 +125,7 @@ def main(
     elif sequence_num == 2:
         # pairwise sequence alignment case
         click.secho(
-            f"Number of sequences: {sequence_num}, running De Bruijn pairwise alignment",
+            f"Number of sequences: {sequence_num}, running de Bruijn pairwise alignment",
             fg="green",
         )
         dbg = DeBruijnPairwise(data=sequence_collection, k=k, moltype=moltype)
@@ -138,7 +138,7 @@ def main(
     else:
         # multiple sequence alignment case
         click.secho(
-            f"Number of sequences: {sequence_num}, running De Bruijn multiple sequence alignment",
+            f"Number of sequences: {sequence_num}, running de Bruijn multiple sequence alignment",
             fg="green",
         )
         dbg = DeBruijnMultiSeqs(data=sequence_collection, k=k, moltype=moltype)
