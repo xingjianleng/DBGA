@@ -542,11 +542,6 @@ class DeBruijnMultiSeqs:
             aln[j].append(bubble_alignment[j])
 
         aln_str = ["".join(aln_seq) for aln_seq in aln]
-        aln_length = len(aln_str[0])
-        if not all(len(aln_seq) == aln_length for aln_seq in aln_str):
-            raise ValueError(
-                "Incorrect multiple sequence alignment generated, usually caused by small kmer sizes"
-            )
 
         return make_aligned_seqs(
             {name: aln_str[i] for i, name in enumerate(self.names)},

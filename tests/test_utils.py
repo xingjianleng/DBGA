@@ -11,6 +11,11 @@ def sequence_loader_checker(seqs, exp_seq1: str, exp_seq2: str):
     assert seqs.seqs[1] == exp_seq2
 
 
+def msa_checker(seqs, exp_aln):
+    for key, value in seqs.to_dict().items():
+        assert value == exp_aln[key]
+
+
 def test_read_debruijn_edge_kmer():
     # empty string test case
     seq1 = ""
@@ -207,6 +212,44 @@ def test_sop():
         "gap_extend": 7,
     }
     assert pairs == exp_dict
+
+
+def test_dna_msa():
+    input1 = make_unaligned_seqs(
+        {
+            "seq1": "",
+            "seq2": "",
+            "seq3": "",
+        },
+        moltype="dna"
+    )
+    msa_checker(dna_msa(input1), {"seq1": "", "seq2": "", "seq3": ""})
+
+    input2 = make_unaligned_seqs(
+        {
+            "seq1": "ACTG",
+            "seq2": "CCTG",
+            "seq3": ""
+        },
+        moltype="dna"
+    )
+    msa_checker(dna_msa(input2), {"seq1": "ACTG", "seq2": "CCTG", "seq3": "----"})
+
+    input3 = load_unaligned_seqs(
+        "data/msa_example5.fasta",
+        moltype="dna"
+    )
+    # the special case where alignment could generate ambiguity, use a different method for testing
+    aln_result3 = dna_msa(input3)
+    expected_sol1 = {"seq1": "GTACACGCG", "seq2": "GTACA-GCG", "seq3": "GTACAAGCG"}
+    expected_sol2 = {"seq1": "GTACACGCG", "seq2": "GTAC-AGCG", "seq3": "GTACAAGCG"}
+    for key, value in aln_result3.to_dict().items():
+        assert expected_sol1[key] == value or expected_sol2[key] == value
+
+
+def test_get_closest_odd():
+    assert get_closest_odd(3, True) == 3 and get_closest_odd(3, False) == 3
+    assert get_closest_odd(4, True) == 5 and get_closest_odd(4, False) == 3
 
 
 if __name__ == "__main__":

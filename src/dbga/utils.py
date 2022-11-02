@@ -8,7 +8,9 @@ from typing import Any, Dict, List, Tuple, Set, Union
 
 from cogent3.align import global_pairwise
 from cogent3.align.progressive import TreeAlign
+from cogent3.core.sequence import DnaSequence
 from cogent3.evolve.fast_distance import DistanceMatrix
+from cogent3.maths.stats.number import CategoryCounter
 from cogent3 import load_unaligned_seqs, make_unaligned_seqs
 from cogent3 import SequenceCollection, ArrayAlignment
 import graphviz
@@ -320,6 +322,51 @@ def to_DOT(nodes: List[Node]) -> graphviz.Digraph:  # pragma: no cover
                 weight=str(edge.multiplicity),
             )
     return dot
+
+
+def get_closest_odd(num: int, upper: bool) -> int:
+    """get the closest odd number of the given number
+        used for generate candidate k-mer sizes
+
+    Parameters
+    ----------
+    num : int
+        the provided number
+    upper : bool
+        whether take the smallest odd number greater than the given number
+        or the largest odd number smaller than the given number
+
+    Returns
+    -------
+    int
+        the closest odd number of the given number with the given condition
+    """
+    if upper and num & 1 == 0:
+        return num + 1
+    elif not upper and num & 1 == 0:
+        return num - 1
+    else:
+        return num
+
+
+def get_seqs_entropy(seqs_collection: SequenceCollection) -> float:  # pragma: no cover
+    """calculate the entropy of sequences in the SequenceCollection object
+
+    Parameters
+    ----------
+    seqs_collection : 
+        the input SequenceCollection object
+
+    Returns
+    -------
+    float
+        entropy of sequences in the SequenceCollection object
+    """
+    seqs = [str(seq) for seq in seqs_collection.iter_seqs()]
+    seqs = DnaSequence("".join(seqs))
+    suggested_k = math.ceil(math.log(len(seqs), 4))
+    counts = CategoryCounter(seqs.iter_kmers(k=suggested_k))
+    return counts.entropy
 
 
 def predict_p(seqs: SequenceCollection, k: int) -> float:  # pragma: no cover
