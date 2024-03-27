@@ -1,3 +1,4 @@
+import os
 from cogent3 import load_unaligned_seqs
 from cogent3.align import make_dna_scoring_dict
 from dbga.adaptive_debruijn import adpt_dbg_alignment_recursive
@@ -15,33 +16,33 @@ def adaptive_dbg_alignment_checker(file, k_choice, aln_str_res):
         input, k_index=0, k_choice=k_choice, s=s, d=10, e=2) == aln_str_res
 
 
-def test_adpt_dbg_alignment_recursive_1():
+def test_adpt_dbg_alignment_recursive_1(data_dir):
     # simple test on adaptive de Bruijn alignment
-    file = "data/gap_bubble_duplicate.fasta"
+    file = os.path.join(data_dir,"gap_bubble_duplicate.fasta")
     k_choice = (3, 2)
     aln_str_res = ("GTACACGTATG", "GTACACG-ATG")
     adaptive_dbg_alignment_checker(file, k_choice, aln_str_res)
 
 
-def test_adpt_dbg_alignment_recursive_2():
+def test_adpt_dbg_alignment_recursive_2(data_dir):
     # test case to see whether the algorithm can filter invalid k choices
-    file = "data/gap_bubble_duplicate.fasta"
+    file = os.path.join(data_dir,"gap_bubble_duplicate.fasta")
     k_choice = (7, 5, 3, 2)
     aln_str_res = ("GTACACGTATG", "GTACACG-ATG")
     adaptive_dbg_alignment_checker(file, k_choice, aln_str_res)
 
 
-def test_adpt_dbg_alignment_recursive_3():
+def test_adpt_dbg_alignment_recursive_3(data_dir):
     # test case when restricting 
-    file = "data/duplicate_unbalanced_end.fasta"
+    file = os.path.join(data_dir,"duplicate_unbalanced_end.fasta")
     k_choice = (3,)
     aln_str_res = ("TGTACGTCAATGTCG", "TGTAAGTCAATG---")
     adaptive_dbg_alignment_checker(file, k_choice, aln_str_res)
 
 
-def test_adpt_dbg_alignment_recursive_4():
+def test_adpt_dbg_alignment_recursive_4(data_dir):
     # test case where the duplicate k-mers exists in the stem
-    file = "data/duplicate_in_stem.fasta"
+    file = os.path.join(data_dir,"duplicate_in_stem.fasta")
     k_choice = (3,)
     aln_str_res = ("GTACACGTATG", "GTACTCGTATG")
     adaptive_dbg_alignment_checker(file, k_choice ,aln_str_res)

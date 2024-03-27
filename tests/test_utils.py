@@ -1,3 +1,4 @@
+import os
 from cogent3.align import make_dna_scoring_dict
 from cogent3.core.alphabet import AlphabetError
 from cogent3 import SequenceCollection, make_aligned_seqs
@@ -36,9 +37,9 @@ def test_read_debruijn_edge_kmer():
         read_nucleotide_from_kmers(seq5, 2)
 
 
-def test_load_sequences():
+def test_load_sequences(data_dir):
     # given a path, load sequences
-    path = "data/gap_at_end.fasta"
+    path = os.path.join(data_dir,"gap_at_end.fasta")
     sequence_loader_checker(
         load_sequences(path, moltype="dna"), "GTACAAGCGATG", "GTACAAGCGA"
     )
@@ -214,7 +215,7 @@ def test_sop():
     assert pairs == exp_dict
 
 
-def test_dna_msa():
+def test_dna_msa(data_dir):
     input1 = make_unaligned_seqs(
         {
             "seq1": "",
@@ -236,7 +237,7 @@ def test_dna_msa():
     msa_checker(dna_msa(input2), {"seq1": "ACTG", "seq2": "CCTG", "seq3": "----"})
 
     input3 = load_unaligned_seqs(
-        "data/msa_example5.fasta",
+        os.path.join(data_dir,"msa_example5.fasta"),
         moltype="dna"
     )
     # the special case where alignment could generate ambiguity, use a different method for testing

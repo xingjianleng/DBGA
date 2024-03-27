@@ -1,3 +1,4 @@
+import os
 from dbga.debruijn_pairwise import *
 import pytest
 
@@ -46,12 +47,12 @@ def example_checker(seqs, k, exp_seq1_idx, exp_seq2_idx, exp_merge, exp_aln):
     assert db.merge_node_idx == exp_merge
 
 
-def test_substitution_middle():
+def test_substitution_middle(data_dir):
     # NOTE: Basic substitution test
     seq1 = "GTACAAGCGA"
     seq2 = "GTACACGCGA"
     example_checker(
-        seqs="data/substitution_middle.fasta",
+        seqs=os.path.join(data_dir,"substitution_middle.fasta"),
         k=3,
         exp_seq1_idx=list(range(10)),
         exp_seq2_idx=[10, 1, 2, 3, 11, 12, 13, 7, 8, 14],
@@ -60,12 +61,12 @@ def test_substitution_middle():
     )
 
 
-def test_gap_bubble_duplicate():
+def test_gap_bubble_duplicate(data_dir):
     # NOTE: Bubble in the middle (gap) test, with duplicate kmers
     seq1 = "GTACACGTATG"
     seq2 = "GTACACG-ATG"
     example_checker(
-        seqs="data/gap_bubble_duplicate.fasta",
+        seqs=os.path.join(data_dir,"gap_bubble_duplicate.fasta"),
         k=3,
         exp_seq1_idx=list(range(9)),
         exp_seq2_idx=[9, 1, 2, 3, 4, 10, 11, 7, 12],
@@ -74,12 +75,12 @@ def test_gap_bubble_duplicate():
     )
 
 
-def test_gap_at_end():
+def test_gap_at_end(data_dir):
     # NOTE: Gaps at unbalanced ends of sequences
     seq1 = "GTACAAGCGATG"
     seq2 = "GTACAAGCGA--"
     example_checker(
-        seqs="data/gap_at_end.fasta",
+        seqs=os.path.join(data_dir,"gap_at_end.fasta"),
         k=3,
         exp_seq1_idx=list(range(12)),
         exp_seq2_idx=[12, 1, 2, 3, 4, 5, 6, 7, 8, 13],
@@ -88,12 +89,12 @@ def test_gap_at_end():
     )
 
 
-def test_gap_at_start():
+def test_gap_at_start(data_dir):
     # NOTE: Gaps at unbalanced starts of sequences
     seq1 = "TGTACAAGCGA"
     seq2 = "-GTACAAGCGA"
     example_checker(
-        seqs="data/gap_at_start.fasta",
+        seqs=os.path.join(data_dir,"gap_at_start.fasta"),
         k=3,
         exp_seq1_idx=list(range(11)),
         exp_seq2_idx=[11, 2, 3, 4, 5, 6, 7, 8, 9, 12],
@@ -102,12 +103,12 @@ def test_gap_at_start():
     )
 
 
-def test_bubble_consecutive_duplicate():
+def test_bubble_consecutive_duplicate(data_dir):
     # NOTE: Subtitution in the middle. Two duplicate kmers (consecutive)
     seq1 = "TGTACTGTAGA"
     seq2 = "TGTACTATAGA"
     example_checker(
-        seqs="data/bubble_consecutive_duplicate.fasta",
+        seqs=os.path.join(data_dir,"bubble_consecutive_duplicate.fasta"),
         k=3,
         exp_seq1_idx=list(range(7)),
         exp_seq2_idx=[7, 1, 2, 8, 9, 10, 4, 5, 11],
@@ -116,12 +117,12 @@ def test_bubble_consecutive_duplicate():
     )
 
 
-def test_duplicate_unbalanced_end():
+def test_duplicate_unbalanced_end(data_dir):
     # NOTE: Very comprehensive test, duplicate kmers (anywhere, even after merge node), unbalanced ends
     seq1 = "TGTACGTCAATGTCG"
     seq2 = "TGTAAGTCAATG---"
     example_checker(
-        seqs="data/duplicate_unbalanced_end.fasta",
+        seqs=os.path.join(data_dir,"duplicate_unbalanced_end.fasta"),
         k=3,
         exp_seq1_idx=list(range(11)),
         exp_seq2_idx=[11, 1, 12, 13, 14, 5, 6, 7, 8, 15],
@@ -130,13 +131,13 @@ def test_duplicate_unbalanced_end():
     )
 
 
-def test_unbalanced_end_w_duplicate():
+def test_unbalanced_end_w_duplicate(data_dir):
     # NOTE: Very comprehensive test, duplicate kmers (anywhere, even after merge node), unbalanced ends
     #       Sequence end by duplicate kmer
     seq1 = "TGTACGTCAATGTCG"
     seq2 = "TGTAAGTCAATGT--"
     example_checker(
-        seqs="data/unbalanced_end_w_duplicate.fasta",
+        seqs=os.path.join(data_dir,"unbalanced_end_w_duplicate.fasta"),
         k=3,
         exp_seq1_idx=list(range(11)),
         exp_seq2_idx=[11, 1, 12, 13, 14, 5, 6, 7, 8, 15],
@@ -145,13 +146,13 @@ def test_unbalanced_end_w_duplicate():
     )
 
 
-def test_duplicate_kmer_in_bubble():
+def test_duplicate_kmer_in_bubble(data_dir):
     # NOTE: There are many duplicate kmers in this test case.
     #       They are all in the bubble of the de Bruijn graph
     seq1 = "TAC-ACGTAAT"
     seq2 = "TACGACG-AAT"
     example_checker(
-        seqs="data/duplicate_kmer_in_bubble.fasta",
+        seqs=os.path.join(data_dir,"duplicate_kmer_in_bubble.fasta"),
         k=3,
         exp_seq1_idx=list(range(9)),
         exp_seq2_idx=[9, 1, 10, 11, 7, 12],
@@ -160,13 +161,13 @@ def test_duplicate_kmer_in_bubble():
     )
 
 
-def test_both_end_duplicate():
+def test_both_end_duplicate(data_dir):
     # NOTE: Two sequences end with duplicate kmers, and these duplicate kmers are connected
     #       to a merge node.
     seq1 = "ACGTGACG"
     seq2 = "ACTTGACG"
     example_checker(
-        seqs="data/both_end_duplicate.fasta",
+        seqs=os.path.join(data_dir,"both_end_duplicate.fasta"),
         k=3,
         exp_seq1_idx=list(range(6)),
         exp_seq2_idx=[6, 7, 8, 9, 3, 4, 10],
@@ -175,12 +176,12 @@ def test_both_end_duplicate():
     )
 
 
-def test_unrelated_sequences():
+def test_unrelated_sequences(data_dir):
     # NOTE: Two sequences do not share any common kmer
     seq1 = "ACGT--AGTATC"
     seq2 = "ACCTACAGCA--"
     example_checker(
-        seqs="data/unrelated_sequences.fasta",
+        seqs=os.path.join(data_dir,"unrelated_sequences.fasta"),
         k=3,
         exp_seq1_idx=list(range(8)),
         exp_seq2_idx=list(range(8, 18)),
