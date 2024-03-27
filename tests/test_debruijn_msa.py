@@ -1,3 +1,4 @@
+import os
 from dbga.debruijn_msa import *
 import pytest
 
@@ -33,12 +34,12 @@ def msa_three_seqs_checker(seqs, k, exp_seqs_idx, exp_merge, exp_aln):
     assert db.merge_node_idx == exp_merge
 
 
-def test_msa_example1():
+def test_msa_example1(data_dir):
     seq1 = "ACTTGACAGCT"
     seq2 = "ACATGACAGCT"
     seq3 = "ACTTGACACGT"
     msa_three_seqs_checker(
-        seqs="data/msa_example1.fasta",
+        seqs= os.path.join(data_dir,"msa_example1.fasta"),
         k=3,
         exp_seqs_idx=[
             list(range(10)),
@@ -50,12 +51,12 @@ def test_msa_example1():
     )
 
 
-def test_msa_example2_not_optimal():
+def test_msa_example2_not_optimal(data_dir):
     seq1 = "GTAATTGCCACGCGA--"
     seq2 = "GTAATTGCCT--CGAGA"
     seq3 = "GTAATTGCCACGCGA--"
     msa_three_seqs_checker(
-        seqs="data/msa_example2.fasta",
+        seqs=os.path.join(data_dir,"msa_example2.fasta"),
         k=3,
         exp_seqs_idx=[
             list(range(15)),
@@ -67,12 +68,12 @@ def test_msa_example2_not_optimal():
     )
 
 
-def test_msa_example2_success():
+def test_msa_example2_success(data_dir):
     seq1 = "GTAATTGCCACGCGA"
     seq2 = "GTAATTGCCTCGAGA"
     seq3 = "GTAATTGCCACGCGA"
     msa_three_seqs_checker(
-        seqs="data/msa_example2.fasta",
+        seqs=os.path.join(data_dir,"msa_example2.fasta"),
         k=4,
         exp_seqs_idx=[
             list(range(14)),
@@ -84,21 +85,21 @@ def test_msa_example2_success():
     )
 
 
-def test_msa_example3_fail():
+def test_msa_example3_fail(data_dir):
     with pytest.raises(ValueError) as e:
-        DeBruijnMultiSeqs("data/msa_example3.fasta", k=3, moltype="dna")
+        DeBruijnMultiSeqs(os.path.join(data_dir,"msa_example3.fasta"), k=3, moltype="dna")
         assert (
             e.value
             == "Cycles detected in de Bruijn graph, usually caused by small kmer sizes"
         )
 
 
-def test_msa_example3_success():
+def test_msa_example3_success(data_dir):
     seq1 = "TACCGTCCAGACGTAAT"
     seq2 = "TACGGTCCAGACCTAAT"
     seq3 = "TACGGTCCAGACCTAAT"
     msa_three_seqs_checker(
-        seqs="data/msa_example3.fasta",
+        seqs=os.path.join(data_dir,"msa_example3.fasta"),
         k=4,
         exp_seqs_idx=[
             list(range(16)),
@@ -110,12 +111,12 @@ def test_msa_example3_success():
     )
 
 
-def test_msa_example4():
+def test_msa_example4(data_dir):
     seq1 = "GTACAAGCGATG"
     seq2 = "GTACAAGCGA--"
     seq3 = "GTAC-AGCGATG"
     msa_three_seqs_checker(
-        seqs="data/msa_example4.fasta",
+        seqs=os.path.join(data_dir,"msa_example4.fasta"),
         k=3,
         exp_seqs_idx=[
             list(range(12)),
@@ -127,12 +128,12 @@ def test_msa_example4():
     )
 
 
-def test_msa_example5():
+def test_msa_example5(data_dir):
     seq1 = "GTACACGCG"
     seq2 = "GTACA-GCG"
     seq3 = "GTACAAGCG"
     msa_three_seqs_checker(
-        seqs="data/msa_example5.fasta",
+        seqs=os.path.join(data_dir,"msa_example5.fasta"),
         k=3,
         exp_seqs_idx=[
             list(range(9)),

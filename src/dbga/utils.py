@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple, Set, Union
 
 from cogent3.align import global_pairwise
-from cogent3.align.progressive import TreeAlign
+from cogent3.align.progressive import tree_align
 from cogent3.core.sequence import DnaSequence
 from cogent3.evolve.fast_distance import DistanceMatrix
 from cogent3.maths.stats.number import CategoryCounter
@@ -228,7 +228,7 @@ def dna_msa(
         else:
             tree = dm.quick_tree()
 
-        aln, _ = TreeAlign(
+        aln, _ = tree_align(
             model=model,
             seqs=seqs_not_null,
             tree=tree,
@@ -250,7 +250,7 @@ def dna_msa(
             dm_subset = dm.take_dists(seqs_not_null.names)
             tree = dm_subset.quick_tree()
 
-        aln, _ = TreeAlign(
+        aln, _ = tree_align(
             model=model,
             seqs=seqs_not_null,
             tree=tree,
